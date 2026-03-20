@@ -24,21 +24,19 @@ class MavenResourceOverlayBuildListener(private val project: Project) : ProjectT
 
         for (artifact in artifacts) {
             val outputPath = artifact.outputPath ?: continue
-            val outputDir = Path.of(outputPath)
+            val typeId = artifact.artifactType.id
 
-            // Only process artifacts whose output directory exists (i.e., was actually built)
-            if (!Files.isDirectory(outputDir)) {
-                log.info("Maven Resource Overlay: skipping artifact '${artifact.name}' — output dir does not exist: $outputPath")
-                continue
-            }
+            log.info("Maven Resource Overlay: checking artifact '${artifact.name}', typeId='$typeId', output=$outputPath")
 
-            val artifactTypeName = artifact.artifactType.id
-
-            // Only process exploded WAR and JAR artifacts
-            val artifactType = when {
-                artifactTypeName.contains("war", ignoreCase = true) -> ArtifactType.WAR
-                artifactTypeName.contains("jar", ignoreCase = true) -> ArtifactType.JAR
-                else -> continue
+            // Only process exploded artifacts — archives are built from exploded, no need to process both
+            val artifactType = when (typeId) {
+                "exploded-war" -> ArtifactType.WAR
+                "exploded-ear" -> ArtifactType.WAR  // EAR uses same overlay logic
+                "jar" -> ArtifactType.JAR
+                else -> {
+                    log.info("Maven Resource Overlay: skipping artifact '${artifact.name}' — type '$typeId' not supported (only exploded artifacts)")
+                    continue
+                }
             }
 
             // Find the Maven project that owns this artifact
