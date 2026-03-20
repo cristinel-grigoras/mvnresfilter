@@ -57,7 +57,6 @@ class ResourceProcessorTest {
     @Test
     fun testFilterProperties_DevProfile() {
         val projectDir = PROJECTS_BASE.resolve("minimal-jar")
-        val sourceDir = projectDir.resolve("src/main/resources")
         val artifactOutput = tempFolder.newFolder("artifact").toPath()
 
         val devProps = mapOf(
@@ -72,7 +71,7 @@ class ResourceProcessorTest {
             webResources = emptyList(),
             resources = listOf(
                 ResourceDef(
-                    directory = sourceDir.toString(),
+                    directory = "src/main/resources",
                     includes = emptyList(),
                     excludes = emptyList(),
                     filtering = true,
@@ -97,7 +96,6 @@ class ResourceProcessorTest {
     @Test
     fun testFilterProperties_ProdProfile() {
         val projectDir = PROJECTS_BASE.resolve("minimal-jar")
-        val sourceDir = projectDir.resolve("src/main/resources")
         val artifactOutput = tempFolder.newFolder("artifact").toPath()
 
         val prodProps = mapOf(
@@ -112,7 +110,7 @@ class ResourceProcessorTest {
             webResources = emptyList(),
             resources = listOf(
                 ResourceDef(
-                    directory = sourceDir.toString(),
+                    directory = "src/main/resources",
                     includes = emptyList(),
                     excludes = emptyList(),
                     filtering = true,

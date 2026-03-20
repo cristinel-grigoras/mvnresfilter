@@ -19,7 +19,7 @@ class ResourceProcessor(private val config: OverlayConfig) {
 
     fun processResources() {
         for (resource in config.resources) {
-            val sourceDir = Path.of(resource.directory)
+            val sourceDir = config.projectBasedir.resolve(resource.directory)
             if (!Files.exists(sourceDir) || !sourceDir.isDirectory()) {
                 log.warn("Resource source directory does not exist, skipping: ${resource.directory}")
                 continue
@@ -41,7 +41,7 @@ class ResourceProcessor(private val config: OverlayConfig) {
 
     fun processWebResources() {
         for (webResource in config.webResources) {
-            val sourceDir = Path.of(webResource.directory)
+            val sourceDir = config.projectBasedir.resolve(webResource.directory)
             if (!Files.exists(sourceDir) || !sourceDir.isDirectory()) {
                 log.warn("Web resource source directory does not exist, skipping: ${webResource.directory}")
                 continue
