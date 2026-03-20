@@ -5,6 +5,7 @@ import org.apache.maven.model.Profile
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader
 import org.codehaus.plexus.util.xml.Xpp3Dom
 import java.io.FileReader
+import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -165,11 +166,13 @@ class MavenModelReader {
     }
 
     /**
-     * Merges properties in the following priority order (lowest → highest):
-     * 1. Parent model project-level properties
-     * 2. Child model project-level properties
-     * 3. Active profile properties (in profile declaration order within the combined list)
-     * 4. Built-in properties (project.artifactId, project.version, project.basedir, basedir)
+     * Merges properties matching Maven's actual priority order (lowest → highest):
+     * 1. Project-level filter files (<build><filters>)
+     * 2. Active profile filter files (profile <build><filters>)
+     * 3. Parent model project-level <properties>
+     * 4. Child model project-level <properties>
+     * 5. Active profile <properties> (in pom declaration order, later wins)
+     * 6. Built-in properties (project.artifactId, project.version, project.basedir, basedir)
      */
     private fun mergeProperties(
         childModel: Model,
@@ -180,20 +183,34 @@ class MavenModelReader {
     ): Map<String, String> {
         val result = mutableMapOf<String, String>()
 
-        // 1. Parent project properties
+        // 1. Project-level filter files
+        childModel.build?.filters?.forEach { filterPath ->
+            loadFilterFile(projectBasedir, filterPath, result)
+        }
+
+        // 2. Active profile filter files
+        for (profile in allProfiles) {
+            if (profile.id in effectiveProfileIds) {
+                profile.build?.filters?.forEach { filterPath ->
+                    loadFilterFile(projectBasedir, filterPath, result)
+                }
+            }
+        }
+
+        // 3. Parent project properties
         parentModel?.properties?.forEach { k, v -> result[k.toString()] = v.toString() }
 
-        // 2. Child project properties
+        // 4. Child project properties
         childModel.properties?.forEach { k, v -> result[k.toString()] = v.toString() }
 
-        // 3. Active profile properties (pom declaration order → later wins)
+        // 5. Active profile properties (pom declaration order → later wins)
         for (profile in allProfiles) {
             if (profile.id in effectiveProfileIds) {
                 profile.properties?.forEach { k, v -> result[k.toString()] = v.toString() }
             }
         }
 
-        // 4. Built-in properties
+        // 6. Built-in properties
         val artifactId = childModel.artifactId ?: parentModel?.artifactId ?: ""
         val version = childModel.version ?: childModel.parent?.version ?: parentModel?.version ?: ""
         val basedirStr = projectBasedir.toAbsolutePath().toString()
@@ -203,6 +220,21 @@ class MavenModelReader {
         result["basedir"] = basedirStr
 
         return result
+    }
+
+    /**
+     * Loads properties from a filter file. Path is resolved relative to projectBasedir.
+     */
+    private fun loadFilterFile(projectBasedir: Path, filterPath: String, target: MutableMap<String, String>) {
+        val file = projectBasedir.resolve(filterPath)
+        if (!Files.exists(file)) return
+        try {
+            val props = java.util.Properties()
+            Files.newBufferedReader(file, java.nio.charset.StandardCharsets.UTF_8).use { props.load(it) }
+            props.forEach { k, v -> target[k.toString()] = v.toString() }
+        } catch (e: Exception) {
+            // Skip unreadable filter files
+        }
     }
 
     /**

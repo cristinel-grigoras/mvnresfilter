@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>filter-properties-war</artifactId>
+    <version>1.0.0</version>
+    <packaging>war</packaging>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Project-level defaults (lowest priority) -->
+        <app.name>DefaultApp</app.name>
+        <app.context>/default</app.context>
+        <log.level>INFO</log.level>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <!-- Common filter file loaded for all profiles -->
+        <filters>
+            <filter>src/main/filters/common.properties</filter>
+        </filters>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+    </build>
+
+    <!--
+        Property loading order test:
+        1. Project <properties>: app.name=DefaultApp, app.context=/default, log.level=INFO
+        2. Build <filters>: common.properties → app.name=FilterTestApp (overrides project)
+        3. Profile <filters>: dev.properties → db.url, db.username, app.context=/filtertest-dev
+        4. Profile <properties>: log.level=TRACE (overrides dev.properties log.level=DEBUG)
+        5. Built-in: project.artifactId, project.version, basedir
+
+        Expected final values for "development" profile:
+          app.name        = FilterTestApp     (from common.properties, overrides project default)
+          app.context     = /filtertest-dev   (from dev.properties, overrides project default)
+          log.level       = TRACE             (from profile <properties>, overrides dev.properties DEBUG)
+          db.url          = jdbc:postgresql://localhost:5432/filtertest_dev (from dev.properties)
+          db.pool.min     = 2                 (from dev.properties, overrides common.properties 5)
+          db.pool.max     = 10                (from dev.properties, overrides common.properties 20)
+          cache.provider  = infinispan        (from common.properties only)
+    -->
+    <profiles>
+        <profile>
+            <id>development</id>
+            <properties>
+                <!-- Profile properties override filter file values -->
+                <log.level>TRACE</log.level>
+            </properties>
+            <build>
+                <filters>
+                    <!-- Profile filter loaded after common filter -->
+                    <filter>src/main/filters/dev.properties</filter>
+                </filters>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-war-plugin</artifactId>
+                        <version>3.4.0</version>
+                        <configuration>
+                            <filteringDeploymentDescriptors>true</filteringDeploymentDescriptors>
+                            <webResources>
+                                <resource>
+                                    <directory>profiles/development</directory>
+                                </resource>
+                                <resource>
+                                    <directory>src/main/webapp</directory>
+                                    <filtering>true</filtering>
+                                    <includes>
+                                        <include>WEB-INF/jboss-web.xml</include>
+                                    </includes>
+                                </resource>
+                            </webResources>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>production</id>
+            <properties>
+                <log.level>ERROR</log.level>
+            </properties>
+            <build>
+                <filters>
+                    <filter>src/main/filters/prod.properties</filter>
+                </filters>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-war-plugin</artifactId>
+                        <version>3.4.0</version>
+                        <configuration>
+                            <filteringDeploymentDescriptors>true</filteringDeploymentDescriptors>
+                            <webResources>
+                                <resource>
+                                    <directory>profiles/production</directory>
+                                </resource>
+                                <resource>
+                                    <directory>src/main/webapp</directory>
+                                    <filtering>true</filtering>
+                                    <includes>
+                                        <include>WEB-INF/jboss-web.xml</include>
+                                    </includes>
+                                </resource>
+                            </webResources>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

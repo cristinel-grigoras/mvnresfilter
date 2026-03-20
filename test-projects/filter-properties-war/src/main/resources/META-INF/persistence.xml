@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Property loading order test -->
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence" version="3.0">
+    <persistence-unit name="filtertest" transaction-type="JTA">
+        <jta-data-source>java:jboss/datasources/FilterTestDS</jta-data-source>
+        <properties>
+            <!-- From filter file (dev.properties or prod.properties) -->
+            <property name="javax.persistence.jdbc.url" value="${db.url}"/>
+            <property name="javax.persistence.jdbc.user" value="${db.username}"/>
+            <!-- From common.properties, overridden by profile filter -->
+            <property name="hibernate.connection.pool_size.min" value="${db.pool.min}"/>
+            <property name="hibernate.connection.pool_size.max" value="${db.pool.max}"/>
+        </properties>
+    </persistence-unit>
+</persistence>

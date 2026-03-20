@@ -223,4 +223,75 @@ class MavenModelReaderTest {
         assertEquals(expectedBasedir, config.mergedProperties["project.basedir"])
         assertEquals(expectedBasedir, config.mergedProperties["basedir"])
     }
+
+    // -------------------------------------------------------------------------
+    // Filter file tests
+    // -------------------------------------------------------------------------
+
+    private val FILTER_TEST_POM = Path.of("src/test/resources/projects/filter-test/pom.xml")
+
+    @Test
+    fun testFilterFile_CommonPropertiesLoaded() {
+        val config = reader.buildConfig(FILTER_TEST_POM, listOf("dev"), tempFolder.root.toPath(), ArtifactType.JAR)
+        // From common.properties
+        assertEquals("common-value", config.mergedProperties["prop.from.common"])
+        assertEquals("postgresql", config.mergedProperties["db.driver"])
+    }
+
+    @Test
+    fun testFilterFile_ProfileFilterOverridesCommon() {
+        val config = reader.buildConfig(FILTER_TEST_POM, listOf("dev"), tempFolder.root.toPath(), ArtifactType.JAR)
+        // From dev.properties (overrides common)
+        assertEquals("dev-filter-value", config.mergedProperties["prop.from.dev"])
+        assertEquals("jdbc:postgresql://localhost/devdb", config.mergedProperties["db.url"])
+    }
+
+    @Test
+    fun testFilterFile_ProjectPropertiesOverrideFilter() {
+        val config = reader.buildConfig(FILTER_TEST_POM, listOf("dev"), tempFolder.root.toPath(), ArtifactType.JAR)
+        // Project <properties> override filter file value
+        assertEquals("project-value", config.mergedProperties["prop.from.project"])
+    }
+
+    @Test
+    fun testFilterFile_ProfilePropertiesOverrideAll() {
+        val config = reader.buildConfig(FILTER_TEST_POM, listOf("dev"), tempFolder.root.toPath(), ArtifactType.JAR)
+        // Priority chain: common filter "from-common-filter" → dev filter "from-dev-filter" → project "from-project" → profile "from-profile"
+        // Profile <properties> wins
+        assertEquals("from-profile", config.mergedProperties["prop.overridden"])
+    }
+
+    @Test
+    fun testFilterFile_NoProfile_OnlyCommonFilter() {
+        val config = reader.buildConfig(FILTER_TEST_POM, emptyList(), tempFolder.root.toPath(), ArtifactType.JAR)
+        // Without profile, only common.properties loaded
+        assertEquals("common-value", config.mergedProperties["prop.from.common"])
+        // dev.properties NOT loaded
+        assertNull(config.mergedProperties["prop.from.dev"])
+        // Project <properties> override common filter
+        assertEquals("from-project", config.mergedProperties["prop.overridden"])
+    }
+
+    @Test
+    fun testFilterFile_MissingFilterFileIgnored() {
+        // The pom references filter files — if they don't exist (e.g., wrong path), should not crash
+        val tempPom = tempFolder.newFolder("missing-filter").toPath()
+        val pomContent = """
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.test</groupId>
+                <artifactId>missing-filter</artifactId>
+                <version>1.0</version>
+                <build>
+                    <filters>
+                        <filter>nonexistent/path/filter.properties</filter>
+                    </filters>
+                </build>
+            </project>
+        """.trimIndent()
+        Files.writeString(tempPom.resolve("pom.xml"), pomContent)
+        // Should not throw
+        val config = reader.buildConfig(tempPom.resolve("pom.xml"), emptyList(), tempFolder.root.toPath(), ArtifactType.JAR)
+        assertNotNull(config)
+    }
 }

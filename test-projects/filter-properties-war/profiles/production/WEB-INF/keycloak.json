@@ -1,0 +1,5 @@
+{
+  "realm": "prod-realm",
+  "auth-server-url": "https://auth.example.com/auth",
+  "resource": "filtertest"
+}
