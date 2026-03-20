@@ -118,7 +118,7 @@ class IncrementalBuildTest {
         ResourceProcessor(config1).processResources()
 
         val cacheInputs1 = buildCacheInputs(config1)
-        val cache = OverlayCache(artifactOutput)
+        val cache = OverlayCache(artifactOutput, "test")
         cache.writeCache(cacheInputs1)
 
         // Second build — same profile, same files
@@ -162,7 +162,7 @@ class IncrementalBuildTest {
         ResourceProcessor(configDev).processResources()
 
         val cacheInputsDev = buildCacheInputs(configDev)
-        val cache = OverlayCache(artifactOutput)
+        val cache = OverlayCache(artifactOutput, "test")
         cache.writeCache(cacheInputsDev)
 
         // Switch to prod profile — build new config and inputs

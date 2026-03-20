@@ -6,8 +6,15 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.Properties
 
-class OverlayCache(private val outputDir: Path) {
-    private val cacheFile: Path = outputDir.resolve(".overlay-cache")
+/**
+ * Cache is stored in [cacheDir] (typically project's target/ or build/ directory),
+ * NOT inside the artifact output directory. File is named per artifact to support
+ * multiple artifacts from the same project.
+ */
+class OverlayCache(private val cacheDir: Path, artifactName: String) {
+
+    private val safeName = artifactName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+    private val cacheFile: Path = cacheDir.resolve(".overlay-cache-$safeName")
 
     fun isUpToDate(inputs: OverlayCacheInputs, expectedOutputPaths: List<Path> = emptyList()): Boolean {
         if (!Files.exists(cacheFile)) return false
@@ -23,7 +30,7 @@ class OverlayCache(private val outputDir: Path) {
     }
 
     fun writeCache(inputs: OverlayCacheInputs) {
-        Files.createDirectories(outputDir)
+        Files.createDirectories(cacheDir)
         val props = Properties()
         props.setProperty("hash", computeHash(inputs))
         props.setProperty("timestamp", Instant.now().toString())

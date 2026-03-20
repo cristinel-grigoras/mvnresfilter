@@ -48,7 +48,8 @@ class MavenResourceOverlayBuildListener(private val project: Project) : ProjectT
                     project = project,
                     artifactOutputPath = Path.of(outputPath),
                     mavenProjectPath = mavenProject.directoryFile.toNioPath(),
-                    artifactType = artifactType
+                    artifactType = artifactType,
+                    artifactName = artifact.name
                 )
                 task.execute()
             } catch (e: Exception) {

@@ -23,7 +23,7 @@ class OverlayCacheTest {
     @Test
     fun testFirstRun_NoFlagFile_Processes() {
         val outputDir = tempFolder.newFolder("output").toPath()
-        val cache = OverlayCache(outputDir)
+        val cache = OverlayCache(outputDir, "test-artifact")
         val inputs = makeInputs(profiles = listOf("dev"))
 
         assertFalse(cache.isUpToDate(inputs))
@@ -35,7 +35,7 @@ class OverlayCacheTest {
     @Test
     fun testFlagFileExists_HashMatches_Skips() {
         val outputDir = tempFolder.newFolder("output").toPath()
-        val cache = OverlayCache(outputDir)
+        val cache = OverlayCache(outputDir, "test-artifact")
         val inputs = makeInputs(
             profiles = listOf("dev"),
             properties = mapOf("db.url" to "jdbc:h2:mem:test"),
@@ -53,7 +53,7 @@ class OverlayCacheTest {
     @Test
     fun testFlagFileExists_HashChanged_Reprocesses() {
         val outputDir = tempFolder.newFolder("output").toPath()
-        val cache = OverlayCache(outputDir)
+        val cache = OverlayCache(outputDir, "test-artifact")
         val devInputs = makeInputs(profiles = listOf("dev"))
         val prodInputs = makeInputs(profiles = listOf("prod"))
 
@@ -68,11 +68,11 @@ class OverlayCacheTest {
     @Test
     fun testFlagFileCorrupt_Reprocesses() {
         val outputDir = tempFolder.newFolder("output").toPath()
-        val cache = OverlayCache(outputDir)
+        val cache = OverlayCache(outputDir, "test-artifact")
         val inputs = makeInputs(profiles = listOf("dev"))
 
         // Write garbage content that cannot be parsed as a valid Properties file with a "hash" key
-        Files.writeString(outputDir.resolve(".overlay-cache"), "\u0000\u0001\u0002GARBAGE_NO_HASH_KEY")
+        Files.writeString(outputDir.resolve(".overlay-cache-test-artifact"), "\u0000\u0001\u0002GARBAGE_NO_HASH_KEY")
 
         assertFalse(cache.isUpToDate(inputs))
     }
@@ -83,7 +83,7 @@ class OverlayCacheTest {
     @Test
     fun testOutputDeleted_Reprocesses() {
         val outputDir = tempFolder.newFolder("output").toPath()
-        val cache = OverlayCache(outputDir)
+        val cache = OverlayCache(outputDir, "test-artifact")
         val inputs = makeInputs(profiles = listOf("dev"))
 
         cache.writeCache(inputs)
@@ -107,7 +107,7 @@ class OverlayCacheTest {
     @Test
     fun testSuccessfulProcessing_WritesCacheFile() {
         val outputDir = tempFolder.newFolder("output").toPath()
-        val cache = OverlayCache(outputDir)
+        val cache = OverlayCache(outputDir, "test-artifact")
         val inputs = makeInputs(
             profiles = listOf("prod"),
             properties = mapOf("app.name" to "MyApp"),
@@ -116,7 +116,7 @@ class OverlayCacheTest {
 
         cache.writeCache(inputs)
 
-        val cacheFile = outputDir.resolve(".overlay-cache")
+        val cacheFile = outputDir.resolve(".overlay-cache-test-artifact")
         assertTrue(".overlay-cache file should exist after writeCache()", Files.exists(cacheFile))
         assertTrue(".overlay-cache file should be readable", Files.isReadable(cacheFile))
         val content = Files.readString(cacheFile)

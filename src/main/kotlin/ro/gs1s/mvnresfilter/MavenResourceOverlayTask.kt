@@ -11,7 +11,8 @@ class MavenResourceOverlayTask(
     private val project: Project,
     private val artifactOutputPath: Path,
     private val mavenProjectPath: Path,
-    private val artifactType: ArtifactType
+    private val artifactType: ArtifactType,
+    private val artifactName: String = ""
 ) {
     private val log = Logger.getInstance(MavenResourceOverlayTask::class.java)
 
@@ -36,7 +37,9 @@ class MavenResourceOverlayTask(
         val config = reader.buildConfig(pomPath, activeProfiles, artifactOutputPath, artifactType)
         log.info("Maven Resource Overlay: projectBasedir=${config.projectBasedir}, resources=${config.resources.map { it.directory }}, webResources=${config.webResources.map { it.directory }}")
 
-        val cache = OverlayCache(artifactOutputPath)
+        // Cache stored in project's target/ directory, not inside artifact output
+        val cacheDir = config.projectBasedir.resolve("target")
+        val cache = OverlayCache(cacheDir, artifactName)
         val cacheInputs = buildCacheInputs(config)
         if (cache.isUpToDate(cacheInputs)) {
             log.info("Maven Resource Overlay: skipping — cache is up to date")
