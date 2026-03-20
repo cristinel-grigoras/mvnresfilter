@@ -59,16 +59,28 @@ class MavenResourceOverlayTask(
             processor.processWebResources()
             processor.filterDeploymentDescriptors()
 
-            cache.writeCache(cacheInputs)
-
             val fileCount = processor.getFileCount()
-            overlayLog.done(fileCount)
+            val fileErrors = processor.getErrors()
 
-            val profileNames = config.activeProfiles.joinToString(", ")
-            OverlayNotifications.notifySuccess(
-                project,
-                "Maven Resource Overlay: processed $fileCount files for profile(s) [$profileNames]"
-            )
+            if (fileErrors.isEmpty()) {
+                cache.writeCache(cacheInputs)
+                overlayLog.done(fileCount)
+
+                val profileNames = config.activeProfiles.joinToString(", ")
+                OverlayNotifications.notifySuccess(
+                    project,
+                    "Maven Resource Overlay: processed $fileCount files for profile(s) [$profileNames]"
+                )
+            } else {
+                // Don't cache if there were errors — reprocess next time
+                overlayLog.done(fileCount)
+
+                val profileNames = config.activeProfiles.joinToString(", ")
+                OverlayNotifications.notifyWarning(
+                    project,
+                    "Maven Resource Overlay: processed $fileCount files for profile(s) [$profileNames], ${fileErrors.size} file(s) failed"
+                )
+            }
         } catch (e: Exception) {
             log.error("Maven Resource Overlay failed", e)
             OverlayNotifications.notifyError(

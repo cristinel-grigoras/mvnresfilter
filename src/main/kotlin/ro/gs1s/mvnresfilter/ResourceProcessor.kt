@@ -20,6 +20,9 @@ class ResourceProcessor @JvmOverloads constructor(
     private val log = Logger.getInstance(ResourceProcessor::class.java)
     private val propertyPattern = Regex("""\$\{([^}]+)}""")
     private var fileCount = 0
+    private val errors = mutableListOf<String>()
+
+    fun getErrors(): List<String> = errors.toList()
 
     fun processResources() {
         for (resource in config.resources) {
@@ -91,29 +94,36 @@ class ResourceProcessor @JvmOverloads constructor(
                 val relativePath = sourceFile.relativeTo(sourceDir).toString()
                 if (!matchesPatterns(relativePath, includes, excludes)) return@forEach
 
-                val targetFile = targetDir.resolve(relativePath)
-                Files.createDirectories(targetFile.parent)
+                try {
+                    val targetFile = targetDir.resolve(relativePath)
+                    Files.createDirectories(targetFile.parent)
 
-                val ext = sourceFile.extension.lowercase()
-                if (filter && ext !in config.nonFilteredExtensions) {
-                    try {
-                        val content = Files.readString(sourceFile, StandardCharsets.UTF_8)
-                        val filtered = filterContent(content)
-                        val replacements = countReplacements(content, filtered)
-                        Files.writeString(targetFile, filtered, StandardCharsets.UTF_8)
-                        log.debug("Filtered: $relativePath ($replacements properties replaced)")
-                        overlayLog?.filtered(relativePath, replacements)
-                    } catch (e: MalformedInputException) {
-                        log.warn("File is not valid UTF-8, copying as binary: $sourceFile")
+                    val ext = sourceFile.extension.lowercase()
+                    if (filter && ext !in config.nonFilteredExtensions) {
+                        try {
+                            val content = Files.readString(sourceFile, StandardCharsets.UTF_8)
+                            val filtered = filterContent(content)
+                            val replacements = countReplacements(content, filtered)
+                            Files.writeString(targetFile, filtered, StandardCharsets.UTF_8)
+                            log.debug("Filtered: $relativePath ($replacements properties replaced)")
+                            overlayLog?.filtered(relativePath, replacements)
+                        } catch (e: MalformedInputException) {
+                            log.warn("File is not valid UTF-8, copying as binary: $sourceFile")
+                            Files.copy(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING)
+                            overlayLog?.copied("$relativePath (binary fallback)")
+                        }
+                    } else {
                         Files.copy(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING)
-                        overlayLog?.copied("$relativePath (binary fallback)")
+                        log.debug("Copied: $relativePath")
+                        overlayLog?.copied(relativePath)
                     }
-                } else {
-                    Files.copy(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING)
-                    log.debug("Copied: $relativePath")
-                    overlayLog?.copied(relativePath)
+                    fileCount++
+                } catch (e: Exception) {
+                    val msg = "Failed to process $relativePath: ${e.message}"
+                    log.warn(msg, e)
+                    overlayLog?.skipped(msg)
+                    errors.add(msg)
                 }
-                fileCount++
             }
         }
     }
