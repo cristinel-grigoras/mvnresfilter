@@ -19,12 +19,12 @@
 
         <h3>What it does</h3>
         <ul>
-            <li>Copies profile-specific <code>&lt;webResources&gt;</code> (e.g., <code>keycloak.json</code>,
-                <code>oidc.json</code>) into the artifact output</li>
-            <li>Applies <code>${...}</code> property substitution in filtered resources
-                (<code>persistence.xml</code>, <code>config.properties</code>, etc.)</li>
-            <li>Filters deployment descriptors (<code>web.xml</code>, <code>jboss-web.xml</code>)
-                when <code>&lt;filteringDeploymentDescriptors&gt;</code> is enabled</li>
+            <li>Copies profile-specific <code>&lt;webResources&gt;</code> into the artifact output,
+                overlaying files per the active Maven profile</li>
+            <li>Applies <code>${...}</code> property substitution in resources
+                configured with <code>&lt;filtering&gt;true&lt;/filtering&gt;</code></li>
+            <li>Filters deployment descriptors when
+                <code>&lt;filteringDeploymentDescriptors&gt;</code> is enabled</li>
             <li>Respects <code>&lt;nonFilteredFileExtensions&gt;</code> for binary files</li>
             <li>Respects <code>&lt;includes&gt;</code> and <code>&lt;excludes&gt;</code> patterns</li>
             <li>Caches results — skips reprocessing when nothing changed</li>
