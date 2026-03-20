@@ -6,6 +6,7 @@ import com.intellij.packaging.artifacts.ArtifactManager
 import com.intellij.task.ProjectTaskListener
 import com.intellij.task.ProjectTaskManager
 import org.jetbrains.idea.maven.project.MavenProjectsManager
+import java.nio.file.Files
 import java.nio.file.Path
 
 class MavenResourceOverlayBuildListener(private val project: Project) : ProjectTaskListener {
@@ -23,9 +24,17 @@ class MavenResourceOverlayBuildListener(private val project: Project) : ProjectT
 
         for (artifact in artifacts) {
             val outputPath = artifact.outputPath ?: continue
+            val outputDir = Path.of(outputPath)
+
+            // Only process artifacts whose output directory exists (i.e., was actually built)
+            if (!Files.isDirectory(outputDir)) {
+                log.info("Maven Resource Overlay: skipping artifact '${artifact.name}' — output dir does not exist: $outputPath")
+                continue
+            }
+
             val artifactTypeName = artifact.artifactType.id
 
-            // Only process WAR and JAR exploded artifacts
+            // Only process exploded WAR and JAR artifacts
             val artifactType = when {
                 artifactTypeName.contains("war", ignoreCase = true) -> ArtifactType.WAR
                 artifactTypeName.contains("jar", ignoreCase = true) -> ArtifactType.JAR

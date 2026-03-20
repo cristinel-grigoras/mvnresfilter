@@ -17,11 +17,13 @@ repositories {
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
     intellijPlatform {
-        intellijIdea("2025.2.4")
+        local("/home/grigoras/idea-IU-253.31033.145")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
 
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.idea.maven")
+        bundledPlugin("com.intellij.javaee")
+        bundledPlugin("com.intellij.javaee.web")
     }
 
     testImplementation("junit:junit:4.13.2")

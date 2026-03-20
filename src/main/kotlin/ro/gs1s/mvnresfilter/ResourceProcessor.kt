@@ -20,8 +20,9 @@ class ResourceProcessor(private val config: OverlayConfig) {
     fun processResources() {
         for (resource in config.resources) {
             val sourceDir = config.projectBasedir.resolve(resource.directory)
+            log.info("processResources: basedir=${config.projectBasedir}, dir=${resource.directory}, resolved=$sourceDir, exists=${Files.exists(sourceDir)}")
             if (!Files.exists(sourceDir) || !sourceDir.isDirectory()) {
-                log.warn("Resource source directory does not exist, skipping: ${resource.directory}")
+                log.warn("Resource source directory does not exist, skipping: $sourceDir")
                 continue
             }
             val targetDir = if (resource.targetPath != null) {

@@ -32,7 +32,9 @@ class MavenResourceOverlayTask(
 
         val reader = MavenModelReader()
         val pomPath = mavenProject.file.toNioPath()
+        log.info("Maven Resource Overlay: processing ${mavenProject.displayName}, pom=$pomPath, profiles=$activeProfiles, output=$artifactOutputPath, type=$artifactType")
         val config = reader.buildConfig(pomPath, activeProfiles, artifactOutputPath, artifactType)
+        log.info("Maven Resource Overlay: projectBasedir=${config.projectBasedir}, resources=${config.resources.map { it.directory }}, webResources=${config.webResources.map { it.directory }}")
 
         val cache = OverlayCache(artifactOutputPath)
         val cacheInputs = buildCacheInputs(config)
