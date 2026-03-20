@@ -15,11 +15,5 @@
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="Maven Resource Overlay" displayType="BALLOON"/>
         <postStartupActivity implementation="ro.gs1s.mvnresfilter.MavenResourceOverlayStartupActivity"/>
-        <toolWindow id="Maven Resource Overlay" factoryClass="ro.gs1s.mvnresfilter.OverlayToolWindowFactory"
-                    anchor="bottom" secondary="true"
-                    icon="AllIcons.Toolwindows.ToolWindowBuild"/>
     </extensions>
-
-    <projectListeners>
-    </projectListeners>
 </idea-plugin>
