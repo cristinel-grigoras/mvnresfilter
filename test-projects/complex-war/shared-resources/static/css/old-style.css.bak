@@ -1,0 +1,2 @@
+/* This backup file should NOT be copied to the artifact */
+body { background: red; }

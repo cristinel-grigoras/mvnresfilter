@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Configurație specială pentru testare -->
+<persistence xmlns="http://xmlns.jcp.org/xml/ns/persistence" version="2.1">
+    <persistence-unit name="simplejar">
+        <properties>
+            <property name="hibernate.show_sql" value="${hibernate.show_sql}"/>
+            <property name="hibernate.hbm2ddl.auto" value="${hibernate.hbm2ddl_auto}"/>
+        </properties>
+    </persistence-unit>
+</persistence>

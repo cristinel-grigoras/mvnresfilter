@@ -1,0 +1,7 @@
+{
+  "realm": "prod-realm",
+  "auth-server-url": "https://auth.example.com/auth",
+  "ssl-required": "external",
+  "resource": "simpleapp",
+  "public-client": true
+}

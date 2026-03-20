@@ -1,0 +1,5 @@
+{
+  "provider-url": "https://auth.example.com/auth/realms/prod-realm",
+  "client-id": "simpleapp",
+  "ssl-required": "EXTERNAL"
+}

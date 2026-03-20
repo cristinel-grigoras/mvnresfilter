@@ -1,0 +1,11 @@
+{
+  "realm": "prod-realm",
+  "auth-server-url": "https://auth.example.com/auth",
+  "ssl-required": "external",
+  "resource": "complex-app",
+  "public-client": false,
+  "confidential-port": 443,
+  "credentials": {
+    "secret": "CHANGE_ME_IN_SERVER_CONFIG"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "provider-url": "http://localhost:8180/auth/realms/dev-realm",
+  "client-id": "simpleapp-dev",
+  "ssl-required": "NONE"
+}

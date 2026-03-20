@@ -1,0 +1,7 @@
+{
+  "realm": "dev-realm",
+  "auth-server-url": "http://localhost:8180/auth",
+  "ssl-required": "none",
+  "resource": "simpleapp-dev",
+  "public-client": true
+}

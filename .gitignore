@@ -45,4 +45,5 @@ bin/
 CLAUDE.md
 plans/
 docs/
-test-projects/
+test-projects/**/target/
+test-projects/**/.idea/
