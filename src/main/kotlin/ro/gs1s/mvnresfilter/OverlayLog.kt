@@ -46,9 +46,10 @@ class OverlayLog(private val project: Project) {
         message("Skipped:  $msg", MessageEvent.Kind.WARNING)
     }
 
-    fun done(fileCount: Int) {
+    fun done(fileCount: Int, elapsedMs: Long = 0) {
         val buildId = currentBuildId ?: return
-        message("Done: $fileCount files processed", MessageEvent.Kind.INFO)
+        val timeStr = if (elapsedMs > 0) " in ${elapsedMs}ms" else ""
+        message("Done: $fileCount files processed$timeStr", MessageEvent.Kind.INFO)
 
         val finishEvent = FinishBuildEventImpl(
             buildId, null, System.currentTimeMillis(), "completed",

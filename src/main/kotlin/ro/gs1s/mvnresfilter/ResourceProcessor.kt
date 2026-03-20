@@ -7,6 +7,8 @@ import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.extension
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -17,12 +19,18 @@ class ResourceProcessor @JvmOverloads constructor(
     private val overlayLog: OverlayLog? = null
 ) {
 
+    companion object {
+        /** Switch to parallel processing when file count exceeds this threshold */
+        const val PARALLEL_THRESHOLD = 50
+    }
+
     private val log = Logger.getInstance(ResourceProcessor::class.java)
     private val propertyPattern = Regex("""\$\{([^}]+)}""")
-    private var fileCount = 0
-    private val errors = mutableListOf<String>()
+    private val fileCountAtomic = AtomicInteger(0)
+    private val errorsConcurrent = ConcurrentLinkedQueue<String>()
 
-    fun getErrors(): List<String> = errors.toList()
+    fun getErrors(): List<String> = errorsConcurrent.toList()
+    fun getFileCount(): Int = fileCountAtomic.get()
 
     fun processResources() {
         for (resource in config.resources) {
@@ -75,12 +83,10 @@ class ResourceProcessor @JvmOverloads constructor(
                 val replacements = filterFileInPlace(descriptorFile)
                 log.debug("Filtered deployment descriptor: $descriptorName ($replacements properties replaced)")
                 overlayLog?.filtered("WEB-INF/$descriptorName", replacements)
-                fileCount++
+                fileCountAtomic.incrementAndGet()
             }
         }
     }
-
-    fun getFileCount(): Int = fileCount
 
     private fun processDirectory(
         sourceDir: Path,
@@ -89,42 +95,63 @@ class ResourceProcessor @JvmOverloads constructor(
         excludes: List<String>,
         filter: Boolean
     ) {
+        // Collect matching files first
+        val filesToProcess = mutableListOf<Path>()
         Files.walk(sourceDir).use { stream ->
             stream.filter { it.isRegularFile() }.forEach { sourceFile ->
                 val relativePath = sourceFile.relativeTo(sourceDir).toString()
-                if (!matchesPatterns(relativePath, includes, excludes)) return@forEach
-
-                try {
-                    val targetFile = targetDir.resolve(relativePath)
-                    Files.createDirectories(targetFile.parent)
-
-                    val ext = sourceFile.extension.lowercase()
-                    if (filter && ext !in config.nonFilteredExtensions) {
-                        try {
-                            val content = Files.readString(sourceFile, StandardCharsets.UTF_8)
-                            val filtered = filterContent(content)
-                            val replacements = countReplacements(content, filtered)
-                            Files.writeString(targetFile, filtered, StandardCharsets.UTF_8)
-                            log.debug("Filtered: $relativePath ($replacements properties replaced)")
-                            overlayLog?.filtered(relativePath, replacements)
-                        } catch (e: MalformedInputException) {
-                            log.warn("File is not valid UTF-8, copying as binary: $sourceFile")
-                            Files.copy(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING)
-                            overlayLog?.copied("$relativePath (binary fallback)")
-                        }
-                    } else {
-                        Files.copy(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING)
-                        log.debug("Copied: $relativePath")
-                        overlayLog?.copied(relativePath)
-                    }
-                    fileCount++
-                } catch (e: Exception) {
-                    val msg = "Failed to process $relativePath: ${e.message}"
-                    log.warn(msg, e)
-                    overlayLog?.skipped(msg)
-                    errors.add(msg)
+                if (matchesPatterns(relativePath, includes, excludes)) {
+                    filesToProcess.add(sourceFile)
                 }
             }
+        }
+
+        if (filesToProcess.size > PARALLEL_THRESHOLD) {
+            log.debug("Processing ${filesToProcess.size} files in parallel (threshold=$PARALLEL_THRESHOLD)")
+            overlayLog?.let {
+                // Synchronize log access for parallel — messages may interleave but that's acceptable
+            }
+            filesToProcess.parallelStream().forEach { sourceFile ->
+                processFile(sourceFile, sourceDir, targetDir, filter)
+            }
+        } else {
+            for (sourceFile in filesToProcess) {
+                processFile(sourceFile, sourceDir, targetDir, filter)
+            }
+        }
+    }
+
+    private fun processFile(sourceFile: Path, sourceDir: Path, targetDir: Path, filter: Boolean) {
+        val relativePath = sourceFile.relativeTo(sourceDir).toString()
+        try {
+            val targetFile = targetDir.resolve(relativePath)
+            Files.createDirectories(targetFile.parent)
+
+            val ext = sourceFile.extension.lowercase()
+            if (filter && ext !in config.nonFilteredExtensions) {
+                try {
+                    val content = Files.readString(sourceFile, StandardCharsets.UTF_8)
+                    val filtered = filterContent(content)
+                    val replacements = countReplacements(content, filtered)
+                    Files.writeString(targetFile, filtered, StandardCharsets.UTF_8)
+                    log.debug("Filtered: $relativePath ($replacements properties replaced)")
+                    overlayLog?.filtered(relativePath, replacements)
+                } catch (e: MalformedInputException) {
+                    log.warn("File is not valid UTF-8, copying as binary: $sourceFile")
+                    Files.copy(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING)
+                    overlayLog?.copied("$relativePath (binary fallback)")
+                }
+            } else {
+                Files.copy(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING)
+                log.debug("Copied: $relativePath")
+                overlayLog?.copied(relativePath)
+            }
+            fileCountAtomic.incrementAndGet()
+        } catch (e: Exception) {
+            val msg = "Failed to process $relativePath: ${e.message}"
+            log.warn(msg, e)
+            overlayLog?.skipped(msg)
+            errorsConcurrent.add(msg)
         }
     }
 

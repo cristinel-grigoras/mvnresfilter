@@ -52,6 +52,7 @@ class MavenResourceOverlayTask(
 
         overlayLog.header(artifactName, activeProfiles, artifactOutputPath.toString())
 
+        val startTime = System.currentTimeMillis()
         val processor = ResourceProcessor(config, overlayLog)
 
         try {
@@ -59,26 +60,24 @@ class MavenResourceOverlayTask(
             processor.processWebResources()
             processor.filterDeploymentDescriptors()
 
+            val elapsedMs = System.currentTimeMillis() - startTime
             val fileCount = processor.getFileCount()
             val fileErrors = processor.getErrors()
+            val profileNames = config.activeProfiles.joinToString(", ")
 
             if (fileErrors.isEmpty()) {
                 cache.writeCache(cacheInputs)
-                overlayLog.done(fileCount)
-
-                val profileNames = config.activeProfiles.joinToString(", ")
+                overlayLog.done(fileCount, elapsedMs)
                 OverlayNotifications.notifySuccess(
                     project,
-                    "Maven Resource Overlay: processed $fileCount files for profile(s) [$profileNames]"
+                    "Maven Resource Overlay: processed $fileCount files for [$profileNames] in ${elapsedMs}ms"
                 )
             } else {
                 // Don't cache if there were errors — reprocess next time
-                overlayLog.done(fileCount)
-
-                val profileNames = config.activeProfiles.joinToString(", ")
+                overlayLog.done(fileCount, elapsedMs)
                 OverlayNotifications.notifyWarning(
                     project,
-                    "Maven Resource Overlay: processed $fileCount files for profile(s) [$profileNames], ${fileErrors.size} file(s) failed"
+                    "Maven Resource Overlay: processed $fileCount files for [$profileNames] in ${elapsedMs}ms, ${fileErrors.size} file(s) failed"
                 )
             }
         } catch (e: Exception) {
