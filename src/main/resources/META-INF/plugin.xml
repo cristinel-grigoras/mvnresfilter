@@ -14,5 +14,6 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="Maven Resource Overlay" displayType="BALLOON"/>
+        <postStartupActivity implementation="ro.gs1s.mvnresfilter.MavenResourceOverlayStartupActivity"/>
     </extensions>
 </idea-plugin>
