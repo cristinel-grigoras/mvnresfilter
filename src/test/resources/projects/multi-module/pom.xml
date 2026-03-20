@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>multi-module</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>core-lib</module>
+        <module>web-app</module>
+    </modules>
+
+    <properties>
+        <hibernate.show_sql>false</hibernate.show_sql>
+        <hibernate.hbm2ddl_auto>none</hibernate.hbm2ddl_auto>
+        <jbossweb.context>myapp</jbossweb.context>
+        <app.display.name>MyApp</app.display.name>
+        <session.timeout>30</session.timeout>
+    </properties>
+
+    <profiles>
+        <profile>
+            <id>dev</id>
+            <properties>
+                <hibernate.show_sql>true</hibernate.show_sql>
+                <hibernate.hbm2ddl_auto>update</hibernate.hbm2ddl_auto>
+                <jbossweb.context>myapp-dev</jbossweb.context>
+                <app.display.name>MyApp Dev</app.display.name>
+                <session.timeout>60</session.timeout>
+            </properties>
+        </profile>
+        <profile>
+            <id>prod</id>
+            <properties>
+                <hibernate.show_sql>false</hibernate.show_sql>
+                <hibernate.hbm2ddl_auto>validate</hibernate.hbm2ddl_auto>
+                <jbossweb.context>myapp</jbossweb.context>
+                <app.display.name>MyApp</app.display.name>
+                <session.timeout>30</session.timeout>
+            </properties>
+        </profile>
+    </profiles>
+</project>

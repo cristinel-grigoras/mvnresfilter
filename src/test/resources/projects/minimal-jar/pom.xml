@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>minimal-jar</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <hibernate.show_sql>false</hibernate.show_sql>
+        <hibernate.hbm2ddl_auto>none</hibernate.hbm2ddl_auto>
+        <app.url>http://default.example.com</app.url>
+    </properties>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>dev</id>
+            <properties>
+                <hibernate.show_sql>true</hibernate.show_sql>
+                <hibernate.hbm2ddl_auto>update</hibernate.hbm2ddl_auto>
+                <app.url>http://localhost:8080</app.url>
+            </properties>
+        </profile>
+        <profile>
+            <id>prod</id>
+            <properties>
+                <hibernate.show_sql>false</hibernate.show_sql>
+                <hibernate.hbm2ddl_auto>validate</hibernate.hbm2ddl_auto>
+                <app.url>https://prod.example.com</app.url>
+            </properties>
+        </profile>
+    </profiles>
+</project>
