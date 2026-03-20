@@ -13,5 +13,6 @@
     <depends>org.jetbrains.idea.maven</depends>
 
     <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="Maven Resource Overlay" displayType="BALLOON"/>
     </extensions>
 </idea-plugin>
