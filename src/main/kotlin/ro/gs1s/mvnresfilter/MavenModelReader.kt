@@ -111,8 +111,8 @@ class MavenModelReader {
         // Collect resources from child model's project build (profile build resources are separate)
         val resources = collectResources(childModel)
 
-        // Collect war-plugin config from active profiles (in pom declaration order)
-        val warPluginData = collectWarPluginData(allProfiles, effectiveProfileIds)
+        // Collect war-plugin config from project build + active profiles
+        val warPluginData = collectWarPluginData(childModel, allProfiles, effectiveProfileIds)
 
         return OverlayConfig(
             artifactType = artifactType,
@@ -236,6 +236,7 @@ class MavenModelReader {
      * maven-war-plugin configuration.
      */
     private fun collectWarPluginData(
+        model: Model,
         allProfiles: List<Profile>,
         effectiveProfileIds: List<String>
     ): WarPluginData {
@@ -243,29 +244,46 @@ class MavenModelReader {
         val extensions = mutableSetOf<String>()
         var filterDescriptors = false
 
+        // 1. Project-level war-plugin config (default build section)
+        val projectWarPlugin = model.build?.plugins?.firstOrNull {
+            it.artifactId == "maven-war-plugin"
+        }
+        if (projectWarPlugin != null) {
+            val config = projectWarPlugin.configuration as? Xpp3Dom
+            if (config != null) {
+                parseWarPluginConfig(config, webResources, extensions) { filterDescriptors = true }
+            }
+        }
+
+        // 2. Active profile war-plugin config (overrides/extends project-level)
         for (profile in allProfiles) {
             if (profile.id !in effectiveProfileIds) continue
             val warPlugin = findWarPlugin(profile) ?: continue
             val config = warPlugin.configuration as? Xpp3Dom ?: continue
-
-            // filteringDeploymentDescriptors
-            config.getChild("filteringDeploymentDescriptors")?.value?.let {
-                if (it.equals("true", ignoreCase = true)) filterDescriptors = true
-            }
-
-            // nonFilteredFileExtensions
-            config.getChild("nonFilteredFileExtensions")?.children?.forEach { child ->
-                val ext = child.value?.trim()
-                if (!ext.isNullOrEmpty()) extensions.add(ext)
-            }
-
-            // webResources
-            config.getChild("webResources")?.children?.forEach { resourceDom ->
-                webResources.add(parseDomWebResource(resourceDom))
-            }
+            parseWarPluginConfig(config, webResources, extensions) { filterDescriptors = true }
         }
 
         return WarPluginData(webResources, extensions, filterDescriptors)
+    }
+
+    private fun parseWarPluginConfig(
+        config: Xpp3Dom,
+        webResources: MutableList<WebResourceDef>,
+        extensions: MutableSet<String>,
+        onFilterDescriptors: () -> Unit
+    ) {
+        config.getChild("filteringDeploymentDescriptors")?.value?.let {
+            if (it.equals("true", ignoreCase = true)) onFilterDescriptors()
+        }
+
+        config.getChild("nonFilteredFileExtensions")?.children?.forEach { child ->
+            val ext = child.value?.trim()
+            if (!ext.isNullOrEmpty()) extensions.add(ext)
+        }
+
+        config.getChild("webResources")?.children?.forEach { resourceDom ->
+            webResources.add(parseDomWebResource(resourceDom))
+        }
     }
 
     private fun findWarPlugin(profile: Profile): org.apache.maven.model.Plugin? {
