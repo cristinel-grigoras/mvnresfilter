@@ -23,6 +23,8 @@ dependencies {
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.idea.maven")
     }
+
+    testImplementation("junit:junit:4.13.2")
 }
 
 intellijPlatform {
