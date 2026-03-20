@@ -26,7 +26,7 @@ class MavenResourceOverlayBuildListener(private val project: Project) : ProjectT
             val outputPath = artifact.outputPath ?: continue
             val typeId = artifact.artifactType.id
 
-            log.info("Maven Resource Overlay: checking artifact '${artifact.name}', typeId='$typeId', output=$outputPath")
+            log.debug("Maven Resource Overlay: checking artifact '${artifact.name}', typeId='$typeId', output=$outputPath")
 
             // Only process exploded artifacts — archives are built from exploded, no need to process both
             val artifactType = when (typeId) {
@@ -34,7 +34,7 @@ class MavenResourceOverlayBuildListener(private val project: Project) : ProjectT
                 "exploded-ear" -> ArtifactType.WAR  // EAR uses same overlay logic
                 "jar" -> ArtifactType.JAR
                 else -> {
-                    log.info("Maven Resource Overlay: skipping artifact '${artifact.name}' — type '$typeId' not supported (only exploded artifacts)")
+                    log.debug("Maven Resource Overlay: skipping artifact '${artifact.name}' — type '$typeId' not supported (only exploded artifacts)")
                     continue
                 }
             }

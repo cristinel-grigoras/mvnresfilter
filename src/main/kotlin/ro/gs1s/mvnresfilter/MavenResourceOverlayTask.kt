@@ -33,38 +33,41 @@ class MavenResourceOverlayTask(
 
         val reader = MavenModelReader()
         val pomPath = mavenProject.file.toNioPath()
-        log.info("Maven Resource Overlay: processing ${mavenProject.displayName}, pom=$pomPath, profiles=$activeProfiles, output=$artifactOutputPath, type=$artifactType")
+        log.debug("Processing ${mavenProject.displayName}, pom=$pomPath, profiles=$activeProfiles, output=$artifactOutputPath, type=$artifactType")
         val config = reader.buildConfig(pomPath, activeProfiles, artifactOutputPath, artifactType)
-        log.info("Maven Resource Overlay: projectBasedir=${config.projectBasedir}, resources=${config.resources.map { it.directory }}, webResources=${config.webResources.map { it.directory }}")
+        log.debug("projectBasedir=${config.projectBasedir}, resources=${config.resources.map { it.directory }}, webResources=${config.webResources.map { it.directory }}")
 
         // Cache stored in project's target/ directory, not inside artifact output
         val cacheDir = config.projectBasedir.resolve("target")
         val cache = OverlayCache(cacheDir, artifactName)
         val cacheInputs = buildCacheInputs(config)
+
+        val overlayLog = OverlayLog.getInstance(project)
+
         if (cache.isUpToDate(cacheInputs)) {
-            log.info("Maven Resource Overlay: skipping — cache is up to date")
+            log.debug("Skipping — cache is up to date for $artifactName")
+            overlayLog.cacheHit(artifactName)
             return
         }
 
-        val processor = ResourceProcessor(config)
-        var processedCount = 0
+        overlayLog.header(artifactName, activeProfiles, artifactOutputPath.toString())
+
+        val processor = ResourceProcessor(config, overlayLog)
 
         try {
             processor.processResources()
-            processedCount += config.resources.count { it.filtering }
-
             processor.processWebResources()
-            processedCount += config.webResources.size
-
             processor.filterDeploymentDescriptors()
-            if (config.filterDeploymentDescriptors) processedCount += 2
 
             cache.writeCache(cacheInputs)
+
+            val fileCount = processor.getFileCount()
+            overlayLog.done(fileCount)
 
             val profileNames = config.activeProfiles.joinToString(", ")
             OverlayNotifications.notifySuccess(
                 project,
-                "Maven Resource Overlay: processed $processedCount resource groups for profile(s) [$profileNames]"
+                "Maven Resource Overlay: processed $fileCount files for profile(s) [$profileNames]"
             )
         } catch (e: Exception) {
             log.error("Maven Resource Overlay failed", e)
