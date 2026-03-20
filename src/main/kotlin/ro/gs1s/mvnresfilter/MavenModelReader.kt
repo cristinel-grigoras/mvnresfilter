@@ -244,23 +244,35 @@ class MavenModelReader {
         val extensions = mutableSetOf<String>()
         var filterDescriptors = false
 
-        // 1. Project-level war-plugin config (default build section)
-        val projectWarPlugin = model.build?.plugins?.firstOrNull {
-            it.artifactId == "maven-war-plugin"
-        }
-        if (projectWarPlugin != null) {
-            val config = projectWarPlugin.configuration as? Xpp3Dom
-            if (config != null) {
-                parseWarPluginConfig(config, webResources, extensions) { filterDescriptors = true }
+        // Check if any active profile has its own war-plugin config
+        var profileHasWarPlugin = false
+        for (profile in allProfiles) {
+            if (profile.id !in effectiveProfileIds) continue
+            if (findWarPlugin(profile) != null) {
+                profileHasWarPlugin = true
+                break
             }
         }
 
-        // 2. Active profile war-plugin config (overrides/extends project-level)
-        for (profile in allProfiles) {
-            if (profile.id !in effectiveProfileIds) continue
-            val warPlugin = findWarPlugin(profile) ?: continue
-            val config = warPlugin.configuration as? Xpp3Dom ?: continue
-            parseWarPluginConfig(config, webResources, extensions) { filterDescriptors = true }
+        if (profileHasWarPlugin) {
+            // Profile war-plugin replaces project-level (Maven behavior)
+            for (profile in allProfiles) {
+                if (profile.id !in effectiveProfileIds) continue
+                val warPlugin = findWarPlugin(profile) ?: continue
+                val config = warPlugin.configuration as? Xpp3Dom ?: continue
+                parseWarPluginConfig(config, webResources, extensions) { filterDescriptors = true }
+            }
+        } else {
+            // No active profile has war-plugin — use project-level
+            val projectWarPlugin = model.build?.plugins?.firstOrNull {
+                it.artifactId == "maven-war-plugin"
+            }
+            if (projectWarPlugin != null) {
+                val config = projectWarPlugin.configuration as? Xpp3Dom
+                if (config != null) {
+                    parseWarPluginConfig(config, webResources, extensions) { filterDescriptors = true }
+                }
+            }
         }
 
         return WarPluginData(webResources, extensions, filterDescriptors)
