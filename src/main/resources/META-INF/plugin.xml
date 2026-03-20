@@ -1,12 +1,73 @@
 <idea-plugin>
-    <id>ro.gs1s.mvnresfilter.mvnresfilter</id>
+    <id>ro.gs1.idea.maven-resource-overlay</id>
     <name>Maven Resource Overlay</name>
-    <vendor url="https://github.com/cristinel-grigoras">Cristinel Grigoras</vendor>
+    <version>1.0.0</version>
+    <vendor email="cristinel.grigoras@gs1s.ro" url="https://github.com/cristinel-grigoras">Cristinel Grigoras</vendor>
 
     <description><![CDATA[
-        Processes Maven resource filtering and webResources overlays from active profiles
-        during IntelliJ artifact builds. Fixes IDEA-25934 for WAR and JAR projects.
+        <h2>Maven Resource Overlay</h2>
+        <p>
+            Automatically applies Maven resource filtering and <code>&lt;webResources&gt;</code> overlays
+            from active profiles when IntelliJ builds exploded WAR or JAR artifacts.
+        </p>
+        <p>
+            Fixes the long-standing IntelliJ limitation
+            (<a href="https://youtrack.jetbrains.com/issue/IDEA-25934">IDEA-25934</a>)
+            where the artifact builder ignores <code>maven-war-plugin</code> configuration
+            from Maven profiles.
+        </p>
+
+        <h3>What it does</h3>
+        <ul>
+            <li>Copies profile-specific <code>&lt;webResources&gt;</code> (e.g., <code>keycloak.json</code>,
+                <code>oidc.json</code>) into the artifact output</li>
+            <li>Applies <code>${...}</code> property substitution in filtered resources
+                (<code>persistence.xml</code>, <code>config.properties</code>, etc.)</li>
+            <li>Filters deployment descriptors (<code>web.xml</code>, <code>jboss-web.xml</code>)
+                when <code>&lt;filteringDeploymentDescriptors&gt;</code> is enabled</li>
+            <li>Respects <code>&lt;nonFilteredFileExtensions&gt;</code> for binary files</li>
+            <li>Respects <code>&lt;includes&gt;</code> and <code>&lt;excludes&gt;</code> patterns</li>
+            <li>Caches results — skips reprocessing when nothing changed</li>
+            <li>Shows processing details in the Build tool window</li>
+        </ul>
+
+        <h3>Supported project types</h3>
+        <ul>
+            <li><b>WAR</b> — exploded WAR artifacts with <code>&lt;webResources&gt;</code> and resource filtering</li>
+            <li><b>JAR</b> — JAR artifacts with <code>&lt;resources&gt;&lt;filtering&gt;true&lt;/filtering&gt;</code></li>
+        </ul>
+
+        <h3>How it works</h3>
+        <ol>
+            <li>Activate a Maven profile in the Maven tool window</li>
+            <li>Build your exploded artifact (Build → Build Artifacts)</li>
+            <li>The plugin automatically post-processes the artifact output</li>
+            <li>Check the Build tool window for details</li>
+        </ol>
+
+        <h3>Limitations</h3>
+        <ul>
+            <li>Properties must be statically defined in <code>&lt;properties&gt;</code> sections
+                of profiles or the project POM. Dynamic values (environment variables,
+                system properties, <code>settings.xml</code> properties, parent POM inheritance
+                via effective POM resolution) are not supported.</li>
+            <li>Only <code>${property}</code> syntax is supported.
+                The <code>@property@</code> delimiter style (Spring Boot) is not supported.</li>
+            <li>Multi-module projects: each module must be built as a separate artifact.
+                Parent property inheritance works only when both POMs are in the project.</li>
+        </ul>
     ]]></description>
+
+    <change-notes><![CDATA[
+        <h3>1.0.0</h3>
+        <ul>
+            <li>Initial release</li>
+            <li>WAR and JAR artifact support</li>
+            <li>Profile-based resource filtering and webResources overlays</li>
+            <li>Build tool window integration</li>
+            <li>Incremental cache to skip unchanged builds</li>
+        </ul>
+    ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>

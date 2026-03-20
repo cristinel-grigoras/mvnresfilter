@@ -4,8 +4,8 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.10.2"
 }
 
-group = "ro.gs1s.mvnresfilter"
-version = "1.0-SNAPSHOT"
+group = "ro.gs1.idea"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
@@ -35,9 +35,7 @@ intellijPlatform {
             sinceBuild = "252.25557"
         }
 
-        changeNotes = """
-            Initial version
-        """.trimIndent()
+        // Change notes are in plugin.xml <change-notes>
     }
 }
 
