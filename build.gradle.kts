@@ -19,6 +19,7 @@ dependencies {
     intellijPlatform {
         local("/home/grigoras/idea-IU-253.31033.145")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
+        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Plugin.Maven)
 
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.idea.maven")
@@ -51,4 +52,37 @@ kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
+}
+
+// Platform integration tests (src/test/kotlin/**/platform/**) require the full IntelliJ
+// test environment (JBR, sandbox, instrumented classes). The IntelliJ Platform Gradle Plugin
+// only configures the built-in 'test' task with these settings, so we filter via includes/excludes
+// rather than creating a separate Test task.
+tasks.test { exclude("**/platform/**") }
+
+// Extract test task configuration values eagerly to avoid configuration cache serialization issues.
+// The jvmArgumentProviders from the IntelliJ Platform plugin contain objects that hold task references,
+// so we resolve them eagerly into a flat list of strings.
+val testTask = tasks.test.get()
+val testTaskClassesDirs = testTask.testClassesDirs
+val testTaskClasspath = testTask.classpath
+val testTaskJavaLauncher = testTask.javaLauncher
+val testTaskSystemProperties = testTask.systemProperties.toMap()
+val testTaskJvmArgs = testTask.allJvmArgs.toList()
+
+tasks.register<Test>("integrationTest") {
+    description = "Runs platform integration tests requiring the IntelliJ test environment"
+    group = "verification"
+
+    dependsOn(tasks.named("prepareTest"))
+
+    // Mirror the test task's full configuration (classpath, JVM, sandbox, system properties)
+    testClassesDirs = testTaskClassesDirs
+    classpath = testTaskClasspath
+    javaLauncher = testTaskJavaLauncher
+    systemProperties(testTaskSystemProperties)
+    jvmArgs(testTaskJvmArgs)
+
+    // Only run tests under the platform package
+    include("**/platform/**")
 }
