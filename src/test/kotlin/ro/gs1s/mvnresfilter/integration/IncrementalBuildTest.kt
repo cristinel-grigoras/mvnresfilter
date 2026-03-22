@@ -8,100 +8,23 @@ import org.junit.rules.TemporaryFolder
 import ro.gs1s.mvnresfilter.ArtifactType
 import ro.gs1s.mvnresfilter.MavenModelReader
 import ro.gs1s.mvnresfilter.OverlayCache
-import ro.gs1s.mvnresfilter.OverlayCacheInputs
-import ro.gs1s.mvnresfilter.OverlayConfig
 import ro.gs1s.mvnresfilter.ResourceProcessor
 import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 
 class IncrementalBuildTest {
 
     @get:Rule
     val tempFolder = TemporaryFolder()
 
-    companion object {
-        private val PROJECTS_BASE = Path.of("src/test/resources/projects")
-        private val EXPECTED_BASE = Path.of("src/test/resources/expected")
-
-        private fun copyTree(source: Path, target: Path) {
-            Files.walk(source).use { stream ->
-                stream.forEach { src ->
-                    val dest = target.resolve(source.relativize(src))
-                    if (Files.isDirectory(src)) {
-                        Files.createDirectories(dest)
-                    } else {
-                        Files.createDirectories(dest.parent)
-                        Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING)
-                    }
-                }
-            }
-        }
-
-        /**
-         * Resolves relative resource directory paths in the config against the projectBasedir.
-         */
-        private fun resolveRelativePaths(config: OverlayConfig): OverlayConfig {
-            val basedir = config.projectBasedir
-            val resolvedWebResources = config.webResources.map { wr ->
-                val dir = Path.of(wr.directory)
-                val absDir = if (dir.isAbsolute) dir else basedir.resolve(dir)
-                wr.copy(directory = absDir.toString())
-            }
-            val resolvedResources = config.resources.map { r ->
-                val dir = Path.of(r.directory)
-                val absDir = if (dir.isAbsolute) dir else basedir.resolve(dir)
-                r.copy(directory = absDir.toString())
-            }
-            return config.copy(
-                webResources = resolvedWebResources,
-                resources = resolvedResources
-            )
-        }
-
-        /**
-         * Builds an [OverlayCacheInputs] from a resolved [OverlayConfig].
-         * Collects last-modified timestamps for all source files under resource directories.
-         */
-        private fun buildCacheInputs(config: OverlayConfig): OverlayCacheInputs {
-            val sourceFiles = mutableMapOf<String, Long>()
-            for (resource in config.resources) {
-                val dir = Path.of(resource.directory)
-                if (Files.exists(dir) && Files.isDirectory(dir)) {
-                    Files.walk(dir).use { stream ->
-                        stream.filter { Files.isRegularFile(it) }.forEach { file ->
-                            sourceFiles[file.toString()] = Files.getLastModifiedTime(file).toMillis()
-                        }
-                    }
-                }
-            }
-            for (webResource in config.webResources) {
-                val dir = Path.of(webResource.directory)
-                if (Files.exists(dir) && Files.isDirectory(dir)) {
-                    Files.walk(dir).use { stream ->
-                        stream.filter { Files.isRegularFile(it) }.forEach { file ->
-                            sourceFiles[file.toString()] = Files.getLastModifiedTime(file).toMillis()
-                        }
-                    }
-                }
-            }
-            return OverlayCacheInputs(
-                profiles = config.activeProfiles,
-                properties = config.mergedProperties,
-                sourceFiles = sourceFiles
-            )
-        }
-    }
-
     // -------------------------------------------------------------------------
     // Test: second build with same profile and unchanged files → cache hit
     // -------------------------------------------------------------------------
     @Test
     fun testSecondBuild_SameProfile_Skipped() {
-        val fixtureMinimalJar = PROJECTS_BASE.resolve("minimal-jar")
+        val fixtureMinimalJar = TestUtils.PROJECTS_BASE.resolve("minimal-jar")
 
         val tempProject = tempFolder.newFolder("minimal-jar").toPath()
-        copyTree(fixtureMinimalJar, tempProject)
+        TestUtils.copyTree(fixtureMinimalJar, tempProject)
 
         val artifactOutput = tempFolder.newFolder("artifact").toPath()
 
@@ -114,10 +37,10 @@ class IncrementalBuildTest {
             artifactOutputPath = artifactOutput,
             artifactType = ArtifactType.JAR
         )
-        val config1 = resolveRelativePaths(rawConfig1)
+        val config1 = TestUtils.resolveRelativePaths(rawConfig1)
         ResourceProcessor(config1).processResources()
 
-        val cacheInputs1 = buildCacheInputs(config1)
+        val cacheInputs1 = TestUtils.buildCacheInputs(config1)
         val cache = OverlayCache(artifactOutput, "test")
         cache.writeCache(cacheInputs1)
 
@@ -128,8 +51,8 @@ class IncrementalBuildTest {
             artifactOutputPath = artifactOutput,
             artifactType = ArtifactType.JAR
         )
-        val config2 = resolveRelativePaths(rawConfig2)
-        val cacheInputs2 = buildCacheInputs(config2)
+        val config2 = TestUtils.resolveRelativePaths(rawConfig2)
+        val cacheInputs2 = TestUtils.buildCacheInputs(config2)
 
         assertTrue(
             "Cache should be up to date for same profile and unchanged source files",
@@ -142,10 +65,10 @@ class IncrementalBuildTest {
     // -------------------------------------------------------------------------
     @Test
     fun testProfileSwitch_Reprocessed() {
-        val fixtureMinimalJar = PROJECTS_BASE.resolve("minimal-jar")
+        val fixtureMinimalJar = TestUtils.PROJECTS_BASE.resolve("minimal-jar")
 
         val tempProject = tempFolder.newFolder("minimal-jar").toPath()
-        copyTree(fixtureMinimalJar, tempProject)
+        TestUtils.copyTree(fixtureMinimalJar, tempProject)
 
         val artifactOutput = tempFolder.newFolder("artifact").toPath()
 
@@ -158,10 +81,10 @@ class IncrementalBuildTest {
             artifactOutputPath = artifactOutput,
             artifactType = ArtifactType.JAR
         )
-        val configDev = resolveRelativePaths(rawConfigDev)
+        val configDev = TestUtils.resolveRelativePaths(rawConfigDev)
         ResourceProcessor(configDev).processResources()
 
-        val cacheInputsDev = buildCacheInputs(configDev)
+        val cacheInputsDev = TestUtils.buildCacheInputs(configDev)
         val cache = OverlayCache(artifactOutput, "test")
         cache.writeCache(cacheInputsDev)
 
@@ -172,8 +95,8 @@ class IncrementalBuildTest {
             artifactOutputPath = artifactOutput,
             artifactType = ArtifactType.JAR
         )
-        val configProd = resolveRelativePaths(rawConfigProd)
-        val cacheInputsProd = buildCacheInputs(configProd)
+        val configProd = TestUtils.resolveRelativePaths(rawConfigProd)
+        val cacheInputsProd = TestUtils.buildCacheInputs(configProd)
 
         assertFalse(
             "Cache should be stale after profile switch from dev to prod",
@@ -184,7 +107,7 @@ class IncrementalBuildTest {
         ResourceProcessor(configProd).processResources()
 
         // Verify output matches expected/minimal-jar/prod/
-        val expectedDir = EXPECTED_BASE.resolve("minimal-jar/prod")
+        val expectedDir = TestUtils.EXPECTED_BASE.resolve("minimal-jar/prod")
         val actualConfigFile = artifactOutput.resolve("config.properties")
         assertTrue("config.properties should exist in artifact output", Files.exists(actualConfigFile))
 
