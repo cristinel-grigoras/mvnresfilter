@@ -23,6 +23,8 @@
                 overlaying files per the active Maven profile</li>
             <li>Applies <code>${...}</code> property substitution in resources
                 configured with <code>&lt;filtering&gt;true&lt;/filtering&gt;</code></li>
+            <li>Loads properties from external filter files (<code>&lt;build&gt;&lt;filters&gt;</code>)
+                at both project and profile level, with correct Maven priority order</li>
             <li>Filters deployment descriptors when
                 <code>&lt;filteringDeploymentDescriptors&gt;</code> is enabled</li>
             <li>Respects <code>&lt;nonFilteredFileExtensions&gt;</code> for binary files</li>
@@ -48,7 +50,8 @@
         <h3>Limitations</h3>
         <ul>
             <li>Properties must be statically defined in <code>&lt;properties&gt;</code> sections
-                of profiles or the project POM. Dynamic values (environment variables,
+                of profiles or the project POM, or in external filter files
+                (<code>&lt;build&gt;&lt;filters&gt;</code>). Dynamic values (environment variables,
                 system properties, <code>settings.xml</code> properties, parent POM inheritance
                 via effective POM resolution) are not supported.</li>
             <li>Only <code>${property}</code> syntax is supported.
@@ -64,6 +67,7 @@
             <li>Initial release</li>
             <li>WAR and JAR artifact support</li>
             <li>Profile-based resource filtering and webResources overlays</li>
+            <li>External filter file support (<code>&lt;build&gt;&lt;filters&gt;</code>) with correct Maven priority order</li>
             <li>Build tool window integration</li>
             <li>Incremental cache to skip unchanged builds</li>
         </ul>
