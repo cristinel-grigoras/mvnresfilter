@@ -90,4 +90,9 @@ tasks.register<Test>("integrationTest") {
 
     // Only run tests under the platform package
     include("**/platform/**")
+
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = true
+    }
 }
