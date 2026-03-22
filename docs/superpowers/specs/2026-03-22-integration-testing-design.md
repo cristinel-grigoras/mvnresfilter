@@ -167,6 +167,17 @@ object TestUtils {
 
 Existing integration tests (`WarOverlayIntegrationTest`, `JarFilteringIntegrationTest`, `IncrementalBuildTest`) refactored to use `TestUtils`.
 
+## SDK Investigation
+
+All decompiled JARs, extracted classes, and IntelliJ SDK research artifacts must be stored in the shared investigation folder at `~/proiecte/ideadevel/intellij-sdk-investigation/`. This folder has the following structure:
+
+- `docs/` — research notes and API documentation
+- `decompiled/` — decompiled `.class` files from IntelliJ SDK JARs
+- `jars-extracted/` — extracted JAR contents for inspection
+- `platform-classes/` — platform class listings and signatures
+
+When investigating `MavenImportingTestCase`, `MavenTestCase`, `ArtifactManager`, or any other IntelliJ SDK class for the integration tests, place decompiled sources and extracted JARs in this folder — not in the plugin project directory.
+
 ## Changes to Existing Code
 
 - `build.gradle.kts` — add integrationTest source set, task, Maven test framework dependency
