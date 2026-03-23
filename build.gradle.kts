@@ -38,6 +38,12 @@ intellijPlatform {
 
         // Change notes are in plugin.xml <change-notes>
     }
+
+    pluginVerification {
+        ides {
+            recommended()
+        }
+    }
 }
 
 tasks {
