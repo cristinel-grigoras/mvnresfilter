@@ -38,11 +38,12 @@ class IncrementalBuildTest {
             artifactType = ArtifactType.JAR
         )
         val config1 = TestUtils.resolveRelativePaths(rawConfig1)
-        ResourceProcessor(config1).processResources()
+        val processor1 = ResourceProcessor(config1)
+        processor1.processResources()
 
         val cacheInputs1 = TestUtils.buildCacheInputs(config1)
         val cache = OverlayCache(artifactOutput, "test")
-        cache.writeCache(cacheInputs1)
+        cache.writeCache(cacheInputs1, processor1.getOutputFiles())
 
         // Second build — same profile, same files
         val rawConfig2 = MavenModelReader().buildConfig(
@@ -82,11 +83,12 @@ class IncrementalBuildTest {
             artifactType = ArtifactType.JAR
         )
         val configDev = TestUtils.resolveRelativePaths(rawConfigDev)
-        ResourceProcessor(configDev).processResources()
+        val processorDev = ResourceProcessor(configDev)
+        processorDev.processResources()
 
         val cacheInputsDev = TestUtils.buildCacheInputs(configDev)
         val cache = OverlayCache(artifactOutput, "test")
-        cache.writeCache(cacheInputsDev)
+        cache.writeCache(cacheInputsDev, processorDev.getOutputFiles())
 
         // Switch to prod profile — build new config and inputs
         val rawConfigProd = MavenModelReader().buildConfig(

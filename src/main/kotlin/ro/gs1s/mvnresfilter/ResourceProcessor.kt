@@ -28,9 +28,11 @@ class ResourceProcessor @JvmOverloads constructor(
     private val propertyPattern = Regex("""\$\{([^}]+)}""")
     private val fileCountAtomic = AtomicInteger(0)
     private val errorsConcurrent = ConcurrentLinkedQueue<String>()
+    private val outputFilesConcurrent = ConcurrentLinkedQueue<Path>()
 
     fun getErrors(): List<String> = errorsConcurrent.toList()
     fun getFileCount(): Int = fileCountAtomic.get()
+    fun getOutputFiles(): List<Path> = outputFilesConcurrent.toList()
 
     fun processResources() {
         for (resource in config.resources) {
@@ -84,6 +86,7 @@ class ResourceProcessor @JvmOverloads constructor(
                 log.debug("Filtered deployment descriptor: $descriptorName ($replacements properties replaced)")
                 overlayLog?.filtered("WEB-INF/$descriptorName", replacements)
                 fileCountAtomic.incrementAndGet()
+                outputFilesConcurrent.add(descriptorFile)
             }
         }
     }
@@ -147,6 +150,7 @@ class ResourceProcessor @JvmOverloads constructor(
                 overlayLog?.copied(relativePath)
             }
             fileCountAtomic.incrementAndGet()
+            outputFilesConcurrent.add(targetFile)
         } catch (e: Exception) {
             val msg = "Failed to process $relativePath: ${e.message}"
             log.warn(msg, e)

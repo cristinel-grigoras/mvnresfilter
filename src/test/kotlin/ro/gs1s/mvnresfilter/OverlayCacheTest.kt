@@ -42,7 +42,9 @@ class OverlayCacheTest {
             sourceFiles = mapOf("src/main/resources/app.properties" to 1234567890L)
         )
 
-        cache.writeCache(inputs)
+        val outputFile = outputDir.resolve("app.properties")
+        Files.writeString(outputFile, "key=value")
+        cache.writeCache(inputs, listOf(outputFile))
 
         assertTrue(cache.isUpToDate(inputs))
     }
@@ -57,7 +59,9 @@ class OverlayCacheTest {
         val devInputs = makeInputs(profiles = listOf("dev"))
         val prodInputs = makeInputs(profiles = listOf("prod"))
 
-        cache.writeCache(devInputs)
+        val outputFile = outputDir.resolve("app.properties")
+        Files.writeString(outputFile, "key=value")
+        cache.writeCache(devInputs, listOf(outputFile))
 
         assertFalse(cache.isUpToDate(prodInputs))
     }
@@ -78,7 +82,7 @@ class OverlayCacheTest {
     }
 
     // -------------------------------------------------------------------------
-    // Test 5: writeCache(), create expected output, delete it, isUpToDate() → false
+    // Test 5: writeCache(), delete output file, isUpToDate() → false
     // -------------------------------------------------------------------------
     @Test
     fun testOutputDeleted_Reprocesses() {
@@ -86,19 +90,18 @@ class OverlayCacheTest {
         val cache = OverlayCache(outputDir, "test-artifact")
         val inputs = makeInputs(profiles = listOf("dev"))
 
-        cache.writeCache(inputs)
-
-        val expectedOutput = outputDir.resolve("app.properties")
-        Files.writeString(expectedOutput, "key=value")
+        val outputFile = outputDir.resolve("app.properties")
+        Files.writeString(outputFile, "key=value")
+        cache.writeCache(inputs, listOf(outputFile))
 
         // Verify it's up to date when the file exists
-        assertTrue(cache.isUpToDate(inputs, listOf(expectedOutput)))
+        assertTrue(cache.isUpToDate(inputs))
 
-        // Delete the expected output file
-        Files.delete(expectedOutput)
+        // Delete the output file
+        Files.delete(outputFile)
 
         // Now it should not be up to date
-        assertFalse(cache.isUpToDate(inputs, listOf(expectedOutput)))
+        assertFalse(cache.isUpToDate(inputs))
     }
 
     // -------------------------------------------------------------------------
@@ -114,7 +117,9 @@ class OverlayCacheTest {
             sourceFiles = mapOf("src/main/resources/config.xml" to 9876543210L)
         )
 
-        cache.writeCache(inputs)
+        val outputFile = outputDir.resolve("config.xml")
+        Files.writeString(outputFile, "<config/>")
+        cache.writeCache(inputs, listOf(outputFile))
 
         val cacheFile = outputDir.resolve(".overlay-cache-test-artifact")
         assertTrue(".overlay-cache file should exist after writeCache()", Files.exists(cacheFile))

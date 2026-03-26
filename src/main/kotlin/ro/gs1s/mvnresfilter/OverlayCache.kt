@@ -16,25 +16,30 @@ class OverlayCache(private val cacheDir: Path, artifactName: String) {
     private val safeName = artifactName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
     private val cacheFile: Path = cacheDir.resolve(".overlay-cache-$safeName")
 
-    fun isUpToDate(inputs: OverlayCacheInputs, expectedOutputPaths: List<Path> = emptyList()): Boolean {
+    fun isUpToDate(inputs: OverlayCacheInputs): Boolean {
         if (!Files.exists(cacheFile)) return false
-        if (expectedOutputPaths.any { !Files.exists(it) }) return false
         return try {
             val props = Properties()
             Files.newBufferedReader(cacheFile).use { props.load(it) }
             val storedHash = props.getProperty("hash") ?: return false
-            storedHash == computeHash(inputs)
+            if (storedHash != computeHash(inputs)) return false
+
+            // Verify that all output files written last time still exist
+            val outputFiles = props.getProperty("outputFiles") ?: return false
+            if (outputFiles.isBlank()) return false
+            outputFiles.split("\n").all { Files.exists(Path.of(it)) }
         } catch (e: Exception) {
             false
         }
     }
 
-    fun writeCache(inputs: OverlayCacheInputs) {
+    fun writeCache(inputs: OverlayCacheInputs, outputFiles: List<Path>) {
         Files.createDirectories(cacheDir)
         val props = Properties()
         props.setProperty("hash", computeHash(inputs))
         props.setProperty("timestamp", Instant.now().toString())
         props.setProperty("profiles", inputs.profiles.joinToString(","))
+        props.setProperty("outputFiles", outputFiles.joinToString("\n"))
         Files.newBufferedWriter(cacheFile).use { props.store(it, "Maven Resource Overlay cache") }
     }
 

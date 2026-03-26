@@ -1,9 +1,11 @@
 package ro.gs1s.mvnresfilter
 
+import com.intellij.build.BuildDescriptor
 import com.intellij.build.BuildViewManager
 import com.intellij.build.DefaultBuildDescriptor
 import com.intellij.build.events.MessageEvent
-import com.intellij.build.events.impl.*
+import com.intellij.build.progress.BuildProgress
+import com.intellij.build.progress.BuildProgressDescriptor
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 
@@ -11,27 +13,25 @@ import com.intellij.openapi.project.Project
  * Posts overlay processing messages into the Build tool window
  * as a separate build entry ("Maven Resource Overlay").
  *
- * Each overlay run starts a new build entry via StartBuildEvent,
- * posts MessageEvents for each file action, then closes with FinishBuildEvent.
+ * Uses the BuildProgress API to manage build lifecycle:
+ * start → message* → finish/fail.
  */
 @Service(Service.Level.PROJECT)
 class OverlayLog(private val project: Project) {
 
-    private var currentBuildId: Any? = null
+    private var buildProgress: BuildProgress<BuildProgressDescriptor>? = null
 
     fun header(artifactName: String, profiles: List<String>, outputPath: String) {
-        val buildId = "maven-resource-overlay-${System.currentTimeMillis()}"
-        currentBuildId = buildId
-
-        val title = "Maven Resource Overlay [${ profiles.joinToString(", ") }]"
+        val title = "Maven Resource Overlay [${profiles.joinToString(", ")}]"
         val descriptor = DefaultBuildDescriptor(
-            buildId, title, outputPath, System.currentTimeMillis()
+            "maven-resource-overlay-${System.currentTimeMillis()}", title, outputPath, System.currentTimeMillis()
         )
 
-        val startEvent = StartBuildEventImpl(descriptor, "Processing $artifactName...")
-        getBuildView()?.onEvent(buildId, startEvent)
+        val progress = BuildViewManager.createBuildProgress(project)
+        progress.start(SimpleBuildProgressDescriptor(title, descriptor))
+        buildProgress = progress
 
-        message("Artifact: $artifactName → $outputPath", MessageEvent.Kind.INFO)
+        message("Artifact: $artifactName \u2192 $outputPath", MessageEvent.Kind.INFO)
     }
 
     fun filtered(relativePath: String, propertiesReplaced: Int) {
@@ -47,48 +47,26 @@ class OverlayLog(private val project: Project) {
     }
 
     fun done(fileCount: Int, elapsedMs: Long = 0) {
-        val buildId = currentBuildId ?: return
         val timeStr = if (elapsedMs > 0) " in ${elapsedMs}ms" else ""
         message("Done: $fileCount files processed$timeStr", MessageEvent.Kind.INFO)
-
-        val finishEvent = FinishBuildEventImpl(
-            buildId, null, System.currentTimeMillis(), "completed",
-            SuccessResultImpl()
-        )
-        getBuildView()?.onEvent(buildId, finishEvent)
-        currentBuildId = null
+        buildProgress?.finish()
+        buildProgress = null
     }
 
     fun cacheHit(artifactName: String) {
-        val buildId = "maven-resource-overlay-cache-${System.currentTimeMillis()}"
-        currentBuildId = buildId
-
+        val title = "Maven Resource Overlay"
         val descriptor = DefaultBuildDescriptor(
-            buildId, "Maven Resource Overlay", "", System.currentTimeMillis()
+            "maven-resource-overlay-cache-${System.currentTimeMillis()}", title, "", System.currentTimeMillis()
         )
-        val startEvent = StartBuildEventImpl(descriptor, "Cache hit: $artifactName")
-        getBuildView()?.onEvent(buildId, startEvent)
 
-        message("Cache hit: $artifactName — skipping (no changes)", MessageEvent.Kind.INFO)
-
-        val finishEvent = FinishBuildEventImpl(
-            buildId, null, System.currentTimeMillis(), "up-to-date",
-            SuccessResultImpl()
-        )
-        getBuildView()?.onEvent(buildId, finishEvent)
-        currentBuildId = null
+        val progress = BuildViewManager.createBuildProgress(project)
+        progress.start(SimpleBuildProgressDescriptor(title, descriptor))
+        progress.message("Maven Resource Overlay", "Cache hit: $artifactName \u2014 skipping (no changes)", MessageEvent.Kind.INFO, null)
+        progress.finish(true)
     }
 
     private fun message(text: String, kind: MessageEvent.Kind) {
-        val buildId = currentBuildId ?: return
-        val event = MessageEventImpl(
-            buildId, kind, "Maven Resource Overlay", text, null
-        )
-        getBuildView()?.onEvent(buildId, event)
-    }
-
-    private fun getBuildView(): BuildViewManager? {
-        return project.getService(BuildViewManager::class.java)
+        buildProgress?.message("Maven Resource Overlay", text, kind, null)
     }
 
     companion object {
@@ -96,4 +74,12 @@ class OverlayLog(private val project: Project) {
             return project.getService(OverlayLog::class.java)
         }
     }
+}
+
+private class SimpleBuildProgressDescriptor(
+    private val title: String,
+    private val descriptor: BuildDescriptor,
+) : BuildProgressDescriptor {
+    override fun getTitle(): String = title
+    override fun getBuildDescriptor(): BuildDescriptor = descriptor
 }

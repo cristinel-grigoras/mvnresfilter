@@ -66,7 +66,7 @@ class MavenResourceOverlayTask(
             val profileNames = config.activeProfiles.joinToString(", ")
 
             if (fileErrors.isEmpty()) {
-                cache.writeCache(cacheInputs)
+                cache.writeCache(cacheInputs, processor.getOutputFiles())
                 overlayLog.done(fileCount, elapsedMs)
                 OverlayNotifications.notifySuccess(
                     project,
