@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>ro.gs1.idea.maven-resource-overlay</id>
     <name>Maven Resource Overlay</name>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
     <vendor email="cristinel.grigoras@gs1s.ro" url="https://github.com/cristinel-grigoras">Cristinel Grigoras</vendor>
 
     <description><![CDATA[
