@@ -39,11 +39,13 @@ class OverlayLog(private val project: Project) {
     }
 
     fun filtered(relativePath: String, propertiesReplaced: Int) {
+        buildProgress?.message(relativePath, "$propertiesReplaced properties replaced", MessageEvent.Kind.INFO, null)
         output("Filtered: $relativePath ($propertiesReplaced properties replaced)\n")
     }
 
     fun copied(relativePath: String) {
-        output("Copied:   $relativePath\n")
+        buildProgress?.message(relativePath, "copied", MessageEvent.Kind.INFO, null)
+        output("Copied: $relativePath\n")
     }
 
     fun skipped(msg: String) {
