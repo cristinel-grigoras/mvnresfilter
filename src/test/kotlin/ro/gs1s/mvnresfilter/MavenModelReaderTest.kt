@@ -535,6 +535,185 @@ class MavenModelReaderTest {
         assertTrue(wr.filtering)
     }
 
+    @Test
+    fun testWebResourceDirectory_DirectBasedirPlaceholder_ProjectLevel() {
+        val projDir = tempFolder.newFolder("basedir-direct").toPath()
+        Files.createDirectories(projDir.resolve("src/main/webapp"))
+        Files.createDirectories(projDir.resolve("profiles/prod-gs1"))
+        Files.writeString(projDir.resolve("pom.xml"), """
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.test</groupId>
+                <artifactId>basedir-direct</artifactId>
+                <version>1.0.0</version>
+                <packaging>war</packaging>
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-war-plugin</artifactId>
+                            <configuration>
+                                <webResources>
+                                    <webResource>
+                                        <directory>profiles/prod-gs1</directory>
+                                    </webResource>
+                                    <webResource>
+                                        <directory>${'$'}{basedir}/src/main/webapp</directory>
+                                        <filtering>true</filtering>
+                                    </webResource>
+                                </webResources>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+        """.trimIndent())
+
+        val config = reader.buildConfig(
+            projDir.resolve("pom.xml"), emptyList(), tempFolder.root.toPath(), ArtifactType.WAR
+        )
+
+        val basedir = projDir.toAbsolutePath().toString()
+        assertEquals(2, config.webResources.size)
+        assertEquals("profiles/prod-gs1", config.webResources[0].directory)
+        assertEquals("$basedir/src/main/webapp", config.webResources[1].directory)
+        assertTrue(config.webResources[1].filtering)
+    }
+
+    @Test
+    fun testWebResourceDirectory_DirectBasedirPlaceholder_ProfileLevel() {
+        val projDir = tempFolder.newFolder("basedir-profile").toPath()
+        Files.createDirectories(projDir.resolve("src/main/webapp"))
+        Files.createDirectories(projDir.resolve("profiles/prod-gs1"))
+        Files.writeString(projDir.resolve("pom.xml"), """
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.test</groupId>
+                <artifactId>basedir-profile</artifactId>
+                <version>1.0.0</version>
+                <packaging>war</packaging>
+                <profiles>
+                    <profile>
+                        <id>prod-gs1</id>
+                        <build>
+                            <plugins>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-war-plugin</artifactId>
+                                    <configuration>
+                                        <webResources>
+                                            <webResource>
+                                                <directory>profiles/prod-gs1</directory>
+                                            </webResource>
+                                            <webResource>
+                                                <directory>${'$'}{basedir}/src/main/webapp</directory>
+                                                <filtering>true</filtering>
+                                            </webResource>
+                                        </webResources>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </build>
+                    </profile>
+                </profiles>
+            </project>
+        """.trimIndent())
+
+        val config = reader.buildConfig(
+            projDir.resolve("pom.xml"), listOf("prod-gs1"), tempFolder.root.toPath(), ArtifactType.WAR
+        )
+
+        val basedir = projDir.toAbsolutePath().toString()
+        assertEquals(2, config.webResources.size)
+        assertEquals("profiles/prod-gs1", config.webResources[0].directory)
+        assertEquals("$basedir/src/main/webapp", config.webResources[1].directory)
+        assertTrue(config.webResources[1].filtering)
+    }
+
+    /**
+     * Reproduces the real-world POM structure from canamed-web:
+     * - Project-level war-plugin with config (archive, failOnMissingWebXml) but NO webResources
+     * - Profile-level war-plugin with full config including webResources with ${'$'}{basedir}/...
+     * - Profile also has properties and maven-resources-plugin
+     */
+    @Test
+    fun testWebResourceDirectory_ProjectAndProfileWarPlugin_BasedirResolved() {
+        val projDir = tempFolder.newFolder("dual-war-plugin").toPath()
+        Files.createDirectories(projDir.resolve("src/main/webapp/WEB-INF"))
+        Files.createDirectories(projDir.resolve("profiles/prod-gs1"))
+        Files.writeString(projDir.resolve("pom.xml"), """
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.test</groupId>
+                <artifactId>dual-war-plugin</artifactId>
+                <version>1.0.0</version>
+                <packaging>war</packaging>
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-war-plugin</artifactId>
+                            <configuration>
+                                <failOnMissingWebXml>true</failOnMissingWebXml>
+                                <archive>
+                                    <manifest>
+                                        <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                                    </manifest>
+                                </archive>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </build>
+                <profiles>
+                    <profile>
+                        <id>prod-gs1</id>
+                        <properties>
+                            <jbossweb.context>myapp</jbossweb.context>
+                        </properties>
+                        <build>
+                            <plugins>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-resources-plugin</artifactId>
+                                    <version>3.1.0</version>
+                                </plugin>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-war-plugin</artifactId>
+                                    <configuration>
+                                        <warName>${'$'}{project.artifactId}</warName>
+                                        <webResources>
+                                            <webResource>
+                                                <directory>profiles/prod-gs1</directory>
+                                            </webResource>
+                                            <webResource>
+                                                <directory>${'$'}{basedir}/src/main/webapp</directory>
+                                                <filtering>true</filtering>
+                                                <include>**/jboss-web.xml</include>
+                                            </webResource>
+                                        </webResources>
+                                        <filteringDeploymentDescriptors>true</filteringDeploymentDescriptors>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </build>
+                    </profile>
+                </profiles>
+            </project>
+        """.trimIndent())
+
+        val config = reader.buildConfig(
+            projDir.resolve("pom.xml"), listOf("prod-gs1"), tempFolder.root.toPath(), ArtifactType.WAR
+        )
+
+        val basedir = projDir.toAbsolutePath().toString()
+        assertEquals(2, config.webResources.size)
+        assertEquals("profiles/prod-gs1", config.webResources[0].directory)
+        assertEquals("$basedir/src/main/webapp", config.webResources[1].directory)
+        assertTrue(config.webResources[1].filtering)
+        assertTrue(config.filterDeploymentDescriptors)
+    }
+
     // -------------------------------------------------------------------------
     // resolvePropertyPlaceholders utility
     // -------------------------------------------------------------------------

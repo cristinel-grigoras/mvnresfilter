@@ -40,7 +40,7 @@ class ResourceProcessor @JvmOverloads constructor(
             log.debug("processResources: basedir=${config.projectBasedir}, dir=${resource.directory}, resolved=$sourceDir, exists=${Files.exists(sourceDir)}")
             if (!Files.exists(sourceDir) || !sourceDir.isDirectory()) {
                 log.warn("Resource source directory does not exist, skipping: $sourceDir")
-                overlayLog?.skipped("Resource dir not found: ${resource.directory}")
+                overlayLog?.skipped("Resource dir not found: $sourceDir")
                 continue
             }
             val targetDir = if (resource.targetPath != null) {
@@ -62,8 +62,8 @@ class ResourceProcessor @JvmOverloads constructor(
         for (webResource in config.webResources) {
             val sourceDir = config.projectBasedir.resolve(webResource.directory)
             if (!Files.exists(sourceDir) || !sourceDir.isDirectory()) {
-                log.warn("Web resource source directory does not exist, skipping: ${webResource.directory}")
-                overlayLog?.skipped("WebResource dir not found: ${webResource.directory}")
+                log.warn("Web resource source directory does not exist, skipping: $sourceDir")
+                overlayLog?.skipped("WebResource dir not found: $sourceDir")
                 continue
             }
             processDirectory(
@@ -84,7 +84,9 @@ class ResourceProcessor @JvmOverloads constructor(
             if (Files.exists(descriptorFile) && descriptorFile.isRegularFile()) {
                 val replacements = filterFileInPlace(descriptorFile)
                 log.debug("Filtered deployment descriptor: $descriptorName ($replacements properties replaced)")
-                overlayLog?.filtered("WEB-INF/$descriptorName", replacements)
+                if (replacements > 0) {
+                    overlayLog?.filtered("WEB-INF/$descriptorName", replacements)
+                }
                 fileCountAtomic.incrementAndGet()
                 outputFilesConcurrent.add(descriptorFile)
             }
@@ -138,16 +140,21 @@ class ResourceProcessor @JvmOverloads constructor(
                     val replacements = countReplacements(content, filtered)
                     Files.writeString(targetFile, filtered, StandardCharsets.UTF_8)
                     log.debug("Filtered: $relativePath ($replacements properties replaced)")
-                    overlayLog?.filtered(relativePath, replacements)
+                    if (replacements > 0) {
+                        overlayLog?.filtered(relativePath, replacements)
+                    }
                 } catch (e: MalformedInputException) {
                     log.warn("File is not valid UTF-8, copying as binary: $sourceFile")
                     Files.copy(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING)
                     overlayLog?.copied("$relativePath (binary fallback)")
                 }
             } else {
+                val changed = !Files.exists(targetFile) || Files.mismatch(sourceFile, targetFile) != -1L
                 Files.copy(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING)
                 log.debug("Copied: $relativePath")
-                overlayLog?.copied(relativePath)
+                if (changed) {
+                    overlayLog?.copied(relativePath)
+                }
             }
             fileCountAtomic.incrementAndGet()
             outputFilesConcurrent.add(targetFile)

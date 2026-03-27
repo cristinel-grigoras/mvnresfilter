@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>ro.gs1.idea.maven-resource-overlay</id>
     <name>Maven Resource Overlay</name>
-    <version>1.2.1</version>
+    <version>1.2.2</version>
     <vendor email="cristinel.grigoras@gs1s.ro" url="https://github.com/cristinel-grigoras">Cristinel Grigoras</vendor>
 
     <description><![CDATA[
@@ -81,6 +81,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>1.2.2</h3>
+        <ul>
+            <li>Build log now only shows files that were actually changed</li>
+        </ul>
+
         <h3>1.2.0</h3>
         <ul>
             <li><b>Property substitution in paths:</b> <code>${...}</code> placeholders are now resolved in

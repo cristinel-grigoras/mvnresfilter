@@ -15,6 +15,10 @@ import com.intellij.openapi.project.Project
  *
  * Uses the BuildProgress API to manage build lifecycle:
  * start → message* → finish/fail.
+ *
+ * Status events (header, done, skipped) appear in the message tree.
+ * File operation details (filtered, copied) are written to the output
+ * panel (third zone) like IntelliJ's integrated build.
  */
 @Service(Service.Level.PROJECT)
 class OverlayLog(private val project: Project) {
@@ -35,15 +39,16 @@ class OverlayLog(private val project: Project) {
     }
 
     fun filtered(relativePath: String, propertiesReplaced: Int) {
-        message("Filtered: $relativePath ($propertiesReplaced properties replaced)", MessageEvent.Kind.INFO)
+        output("Filtered: $relativePath ($propertiesReplaced properties replaced)\n")
     }
 
     fun copied(relativePath: String) {
-        message("Copied:   $relativePath", MessageEvent.Kind.INFO)
+        output("Copied:   $relativePath\n")
     }
 
     fun skipped(msg: String) {
         message("Skipped:  $msg", MessageEvent.Kind.WARNING)
+        output("Skipped:  $msg\n")
     }
 
     fun done(fileCount: Int, elapsedMs: Long = 0) {
@@ -67,6 +72,10 @@ class OverlayLog(private val project: Project) {
 
     private fun message(text: String, kind: MessageEvent.Kind) {
         buildProgress?.message("Maven Resource Overlay", text, kind, null)
+    }
+
+    private fun output(text: String) {
+        buildProgress?.output(text, true)
     }
 
     companion object {
