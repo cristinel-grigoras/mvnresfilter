@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>ro.gs1.idea.maven-resource-overlay</id>
     <name>Maven Resource Overlay</name>
-    <version>1.0.0</version>
+    <version>1.2.0</version>
     <vendor email="cristinel.grigoras@gs1s.ro" url="https://github.com/cristinel-grigoras">Cristinel Grigoras</vendor>
 
     <description><![CDATA[
@@ -11,7 +11,7 @@
             from active profiles when IntelliJ builds exploded WAR or JAR artifacts.
         </p>
         <p>
-            Fixes the long-standing IntelliJ limitation
+            Partial fix for the long-standing IntelliJ limitation
             (<a href="https://youtrack.jetbrains.com/issue/IDEA-25934">IDEA-25934</a>)
             where the artifact builder ignores <code>maven-war-plugin</code> configuration
             from Maven profiles.
@@ -47,13 +47,32 @@
             <li>Check the Build tool window for details</li>
         </ol>
 
+        <h3>Built-in properties</h3>
+        <p>The following Maven-standard properties are available for <code>${...}</code> substitution
+           in both file contents and path configurations
+           (<code>&lt;directory&gt;</code>, <code>&lt;include&gt;</code>, <code>&lt;exclude&gt;</code>,
+            <code>&lt;targetPath&gt;</code>, <code>&lt;filter&gt;</code>):</p>
+        <ul>
+            <li><b>Project:</b> <code>project.groupId</code>, <code>project.artifactId</code>,
+                <code>project.version</code>, <code>project.name</code>, <code>project.packaging</code>,
+                <code>project.basedir</code></li>
+            <li><b>Build dirs:</b> <code>project.build.directory</code>,
+                <code>project.build.sourceDirectory</code>, <code>project.build.outputDirectory</code>,
+                <code>project.build.testSourceDirectory</code>, <code>project.build.testOutputDirectory</code>,
+                <code>project.build.finalName</code></li>
+            <li><b>Aliases:</b> <code>basedir</code>, <code>groupId</code>, <code>artifactId</code>,
+                <code>version</code>, <code>pom.groupId</code>, <code>pom.artifactId</code>,
+                <code>pom.version</code>, <code>pom.basedir</code></li>
+            <li><b>System:</b> <code>user.dir</code>, <code>user.home</code>, <code>user.name</code>,
+                <code>java.home</code>, <code>java.version</code>, <code>os.name</code>,
+                <code>os.arch</code>, <code>file.separator</code>, <code>path.separator</code>,
+                <code>line.separator</code></li>
+        </ul>
+
         <h3>Limitations</h3>
         <ul>
-            <li>Properties must be statically defined in <code>&lt;properties&gt;</code> sections
-                of profiles or the project POM, or in external filter files
-                (<code>&lt;build&gt;&lt;filters&gt;</code>). Dynamic values (environment variables,
-                system properties, <code>settings.xml</code> properties, parent POM inheritance
-                via effective POM resolution) are not supported.</li>
+            <li>Environment variables (<code>${env.VAR}</code>) and
+                <code>settings.xml</code> properties are not supported.</li>
             <li>Only <code>${property}</code> syntax is supported.
                 The <code>@property@</code> delimiter style (Spring Boot) is not supported.</li>
             <li>Multi-module projects: each module must be built as a separate artifact.
@@ -62,6 +81,26 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>1.2.0</h3>
+        <ul>
+            <li><b>Property substitution in paths:</b> <code>${...}</code> placeholders are now resolved in
+                <code>&lt;directory&gt;</code>, <code>&lt;include&gt;</code>, <code>&lt;exclude&gt;</code>,
+                <code>&lt;targetPath&gt;</code>, and <code>&lt;filter&gt;</code> paths — fixes
+                "WebResource dir not found" when pom uses e.g.
+                <code>&lt;directory&gt;${basedir}/profiles/${build.profile.id}&lt;/directory&gt;</code></li>
+            <li><b>30+ built-in Maven properties:</b> added <code>project.groupId</code>,
+                <code>project.packaging</code>, <code>project.name</code>,
+                <code>project.build.directory</code>, <code>project.build.finalName</code>,
+                short aliases (<code>groupId</code>, <code>artifactId</code>, <code>version</code>),
+                <code>pom.*</code> aliases, and Java system properties
+                (<code>user.dir</code>, <code>user.home</code>, <code>java.version</code>, etc.)</li>
+            <li><b>Property value resolution:</b> <code>${...}</code> inside property values themselves
+                are resolved (e.g. <code>&lt;custom.dir&gt;${basedir}/custom&lt;/custom.dir&gt;</code>)</li>
+            <li><b>Early basedir:</b> <code>basedir</code> is defined before filter file loading,
+                so <code>${basedir}</code> works in <code>&lt;filter&gt;</code> paths</li>
+            <li>Output file content hashing for reliable cache invalidation</li>
+        </ul>
+
         <h3>1.0.0</h3>
         <ul>
             <li>Initial release</li>

@@ -105,7 +105,28 @@ class OverlayCacheTest {
     }
 
     // -------------------------------------------------------------------------
-    // Test 6: writeCache() creates .overlay-cache file that is readable
+    // Test 6: writeCache(), modify output file content, isUpToDate() → false
+    // -------------------------------------------------------------------------
+    @Test
+    fun testOutputModified_Reprocesses() {
+        val outputDir = tempFolder.newFolder("output").toPath()
+        val cache = OverlayCache(outputDir, "test-artifact")
+        val inputs = makeInputs(profiles = listOf("dev"))
+
+        val outputFile = outputDir.resolve("app.properties")
+        Files.writeString(outputFile, "key=value")
+        cache.writeCache(inputs, listOf(outputFile))
+
+        assertTrue(cache.isUpToDate(inputs))
+
+        // Modify the output file content
+        Files.writeString(outputFile, "key=TAMPERED")
+
+        assertFalse(cache.isUpToDate(inputs))
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 7: writeCache() creates .overlay-cache file that is readable
     // -------------------------------------------------------------------------
     @Test
     fun testSuccessfulProcessing_WritesCacheFile() {

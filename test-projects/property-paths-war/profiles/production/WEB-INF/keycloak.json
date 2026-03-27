@@ -1,0 +1,9 @@
+{
+  "realm": "prod-realm",
+  "auth-server-url": "https://auth.prod.example.com/auth",
+  "resource": "propapp",
+  "public-client": false,
+  "credentials": {
+    "secret": "prod-secret-placeholder"
+  }
+}

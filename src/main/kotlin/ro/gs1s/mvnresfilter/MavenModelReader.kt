@@ -13,8 +13,7 @@ import java.nio.file.Path
  * resources, and maven-war-plugin configuration.
  *
  * Property merge order: project-level props → active-profile props (pom declaration order,
- * later wins) → built-in properties (project.artifactId, project.version,
- * project.basedir, basedir).
+ * later wins) → built-in properties (project.*, pom.*, basedir, groupId, etc.).
  *
  * activeByDefault semantics: if any explicit profile ID is activated, all
  * activeByDefault profiles are excluded from the effective set.
@@ -109,17 +108,31 @@ class MavenModelReader {
             projectBasedir = projectBasedir
         )
 
-        // Collect resources from child model's project build (profile build resources are separate)
-        val resources = collectResources(childModel)
+        // Collect resources and resolve ${...} in directory/targetPath before downstream use
+        val resources = collectResources(childModel).map { r ->
+            r.copy(
+                directory = resolvePropertyPlaceholders(r.directory, mergedProps),
+                targetPath = r.targetPath?.let { resolvePropertyPlaceholders(it, mergedProps) },
+                includes = r.includes.map { resolvePropertyPlaceholders(it, mergedProps) },
+                excludes = r.excludes.map { resolvePropertyPlaceholders(it, mergedProps) }
+            )
+        }
 
-        // Collect war-plugin config from project build + active profiles
+        // Collect war-plugin config and resolve ${...} in webResource directories
         val warPluginData = collectWarPluginData(childModel, allProfiles, effectiveProfileIds)
+        val webResources = warPluginData.webResources.map { w ->
+            w.copy(
+                directory = resolvePropertyPlaceholders(w.directory, mergedProps),
+                includes = w.includes.map { resolvePropertyPlaceholders(it, mergedProps) },
+                excludes = w.excludes.map { resolvePropertyPlaceholders(it, mergedProps) }
+            )
+        }
 
         return OverlayConfig(
             artifactType = artifactType,
             activeProfiles = effectiveProfileIds,
             mergedProperties = mergedProps,
-            webResources = warPluginData.webResources,
+            webResources = webResources,
             resources = resources,
             nonFilteredExtensions = warPluginData.nonFilteredExtensions,
             filterDeploymentDescriptors = warPluginData.filterDeploymentDescriptors,
@@ -167,12 +180,15 @@ class MavenModelReader {
 
     /**
      * Merges properties matching Maven's actual priority order (lowest → highest):
+     * 0. basedir defined early (needed for resolving filter file paths)
      * 1. Project-level filter files (<build><filters>)
      * 2. Active profile filter files (profile <build><filters>)
      * 3. Parent model project-level <properties>
      * 4. Child model project-level <properties>
      * 5. Active profile <properties> (in pom declaration order, later wins)
-     * 6. Built-in properties (project.artifactId, project.version, project.basedir, basedir)
+     * 6. Built-in properties (project.*, pom.*, short aliases)
+     *
+     * After all properties are set, a single pass resolves ${...} within property values.
      */
     private fun mergeProperties(
         childModel: Model,
@@ -182,17 +198,25 @@ class MavenModelReader {
         projectBasedir: Path
     ): Map<String, String> {
         val result = mutableMapOf<String, String>()
+        val basedirStr = projectBasedir.toAbsolutePath().toString()
+
+        // 0. Define basedir early so filter file paths can use ${basedir}
+        result["basedir"] = basedirStr
+        result["project.basedir"] = basedirStr
+        result["pom.basedir"] = basedirStr
 
         // 1. Project-level filter files
         childModel.build?.filters?.forEach { filterPath ->
-            loadFilterFile(projectBasedir, filterPath, result)
+            val resolved = resolvePropertyPlaceholders(filterPath, result)
+            loadFilterFile(projectBasedir, resolved, result)
         }
 
         // 2. Active profile filter files
         for (profile in allProfiles) {
             if (profile.id in effectiveProfileIds) {
                 profile.build?.filters?.forEach { filterPath ->
-                    loadFilterFile(projectBasedir, filterPath, result)
+                    val resolved = resolvePropertyPlaceholders(filterPath, result)
+                    loadFilterFile(projectBasedir, resolved, result)
                 }
             }
         }
@@ -210,14 +234,65 @@ class MavenModelReader {
             }
         }
 
-        // 6. Built-in properties
+        // 6. Built-in properties (highest priority — cannot be overridden)
         val artifactId = childModel.artifactId ?: parentModel?.artifactId ?: ""
+        val groupId = childModel.groupId ?: childModel.parent?.groupId ?: parentModel?.groupId ?: ""
         val version = childModel.version ?: childModel.parent?.version ?: parentModel?.version ?: ""
-        val basedirStr = projectBasedir.toAbsolutePath().toString()
+        val name = childModel.name ?: artifactId
+        val packaging = childModel.packaging ?: "jar"
+
+        // Build directories: use model values if set, otherwise Maven defaults
+        val buildDir = childModel.build?.directory ?: "$basedirStr/target"
+        val sourceDir = childModel.build?.sourceDirectory ?: "$basedirStr/src/main/java"
+        val outputDir = childModel.build?.outputDirectory ?: "$basedirStr/target/classes"
+        val testSourceDir = childModel.build?.testSourceDirectory ?: "$basedirStr/src/test/java"
+        val testOutputDir = childModel.build?.testOutputDirectory ?: "$basedirStr/target/test-classes"
+        val finalName = childModel.build?.finalName ?: "$artifactId-$version"
+
+        // project.* properties
+        result["project.groupId"] = groupId
         result["project.artifactId"] = artifactId
         result["project.version"] = version
+        result["project.name"] = name
+        result["project.packaging"] = packaging
         result["project.basedir"] = basedirStr
+        result["project.build.directory"] = buildDir
+        result["project.build.sourceDirectory"] = sourceDir
+        result["project.build.outputDirectory"] = outputDir
+        result["project.build.testSourceDirectory"] = testSourceDir
+        result["project.build.testOutputDirectory"] = testOutputDir
+        result["project.build.finalName"] = finalName
+
+        // Short aliases
+        result["groupId"] = groupId
+        result["artifactId"] = artifactId
+        result["version"] = version
         result["basedir"] = basedirStr
+
+        // pom.* aliases (deprecated but still widely used)
+        result["pom.groupId"] = groupId
+        result["pom.artifactId"] = artifactId
+        result["pom.version"] = version
+        result["pom.basedir"] = basedirStr
+
+        // Java system properties commonly used in Maven poms
+        result["user.dir"] = System.getProperty("user.dir", "")
+        result["user.home"] = System.getProperty("user.home", "")
+        result["user.name"] = System.getProperty("user.name", "")
+        result["java.home"] = System.getProperty("java.home", "")
+        result["java.version"] = System.getProperty("java.version", "")
+        result["os.name"] = System.getProperty("os.name", "")
+        result["os.arch"] = System.getProperty("os.arch", "")
+        result["file.separator"] = System.getProperty("file.separator", "/")
+        result["path.separator"] = System.getProperty("path.separator", ":")
+        result["line.separator"] = System.getProperty("line.separator", "\n")
+
+        // Resolve ${...} within property values themselves (single pass)
+        for ((key, value) in result.toMap()) {
+            if (value.contains("\${")) {
+                result[key] = resolvePropertyPlaceholders(value, result)
+            }
+        }
 
         return result
     }
@@ -334,6 +409,18 @@ class MavenModelReader {
         val build = profile.build ?: return null
         return build.plugins?.firstOrNull { plugin ->
             plugin.artifactId == "maven-war-plugin"
+        }
+    }
+
+    companion object {
+        private val propertyPattern = Regex("""\$\{([^}]+)}""")
+
+        /** Substitutes `${...}` placeholders in [value] using [properties]. Unresolved keys are left as-is. */
+        internal fun resolvePropertyPlaceholders(value: String, properties: Map<String, String>): String {
+            if (!value.contains("\${")) return value
+            return propertyPattern.replace(value) { match ->
+                properties[match.groupValues[1]] ?: match.value
+            }
         }
     }
 

@@ -1,0 +1,6 @@
+{
+  "realm": "dev-realm",
+  "auth-server-url": "http://localhost:8180/auth",
+  "resource": "propapp-dev",
+  "public-client": true
+}

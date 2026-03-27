@@ -24,10 +24,14 @@ class OverlayCache(private val cacheDir: Path, artifactName: String) {
             val storedHash = props.getProperty("hash") ?: return false
             if (storedHash != computeHash(inputs)) return false
 
-            // Verify that all output files written last time still exist
-            val outputFiles = props.getProperty("outputFiles") ?: return false
-            if (outputFiles.isBlank()) return false
-            outputFiles.split("\n").all { Files.exists(Path.of(it)) }
+            // Verify that all output files still exist with the same content hash
+            val outputFileHashes = props.getProperty("outputFileHashes") ?: return false
+            if (outputFileHashes.isBlank()) return false
+            outputFileHashes.split("\n").all { entry ->
+                val (path, expectedHash) = entry.split("=", limit = 2)
+                val file = Path.of(path)
+                Files.exists(file) && hashFile(file) == expectedHash
+            }
         } catch (e: Exception) {
             false
         }
@@ -39,8 +43,20 @@ class OverlayCache(private val cacheDir: Path, artifactName: String) {
         props.setProperty("hash", computeHash(inputs))
         props.setProperty("timestamp", Instant.now().toString())
         props.setProperty("profiles", inputs.profiles.joinToString(","))
-        props.setProperty("outputFiles", outputFiles.joinToString("\n"))
+        props.setProperty("outputFileHashes", outputFiles.joinToString("\n") { "${it}=${hashFile(it)}" })
         Files.newBufferedWriter(cacheFile).use { props.store(it, "Maven Resource Overlay cache") }
+    }
+
+    private fun hashFile(path: Path): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        Files.newInputStream(path).use { input ->
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            while (input.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun computeHash(inputs: OverlayCacheInputs): String {

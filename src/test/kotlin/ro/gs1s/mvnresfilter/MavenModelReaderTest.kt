@@ -294,4 +294,267 @@ class MavenModelReaderTest {
         val config = reader.buildConfig(tempPom.resolve("pom.xml"), emptyList(), tempFolder.root.toPath(), ArtifactType.JAR)
         assertNotNull(config)
     }
+
+    // -------------------------------------------------------------------------
+    // Built-in Maven properties: groupId, packaging, build dirs, aliases
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun testBuiltInProperties_GroupIdAndPackaging() {
+        val artifactOutput = tempFolder.newFolder("out").toPath()
+        val config = reader.buildConfig(
+            pomPath = MINIMAL_JAR_POM,
+            activeProfileIds = emptyList(),
+            artifactOutputPath = artifactOutput,
+            artifactType = ArtifactType.JAR
+        )
+        assertEquals("com.example", config.mergedProperties["project.groupId"])
+        assertEquals("jar", config.mergedProperties["project.packaging"])
+        assertEquals("minimal-jar", config.mergedProperties["project.name"])
+    }
+
+    @Test
+    fun testBuiltInProperties_BuildDirectoryDefaults() {
+        val artifactOutput = tempFolder.newFolder("out").toPath()
+        val config = reader.buildConfig(
+            pomPath = MINIMAL_JAR_POM,
+            activeProfileIds = emptyList(),
+            artifactOutputPath = artifactOutput,
+            artifactType = ArtifactType.JAR
+        )
+        val basedir = MINIMAL_JAR_POM.toAbsolutePath().parent.toString()
+        assertEquals("$basedir/target", config.mergedProperties["project.build.directory"])
+        assertEquals("$basedir/src/main/java", config.mergedProperties["project.build.sourceDirectory"])
+        assertEquals("$basedir/target/classes", config.mergedProperties["project.build.outputDirectory"])
+        assertEquals("minimal-jar-1.0.0", config.mergedProperties["project.build.finalName"])
+    }
+
+    @Test
+    fun testBuiltInProperties_ShortAliases() {
+        val artifactOutput = tempFolder.newFolder("out").toPath()
+        val config = reader.buildConfig(
+            pomPath = MINIMAL_JAR_POM,
+            activeProfileIds = emptyList(),
+            artifactOutputPath = artifactOutput,
+            artifactType = ArtifactType.JAR
+        )
+        assertEquals(config.mergedProperties["project.groupId"], config.mergedProperties["groupId"])
+        assertEquals(config.mergedProperties["project.artifactId"], config.mergedProperties["artifactId"])
+        assertEquals(config.mergedProperties["project.version"], config.mergedProperties["version"])
+    }
+
+    @Test
+    fun testBuiltInProperties_PomAliases() {
+        val artifactOutput = tempFolder.newFolder("out").toPath()
+        val config = reader.buildConfig(
+            pomPath = MINIMAL_JAR_POM,
+            activeProfileIds = emptyList(),
+            artifactOutputPath = artifactOutput,
+            artifactType = ArtifactType.JAR
+        )
+        assertEquals(config.mergedProperties["project.groupId"], config.mergedProperties["pom.groupId"])
+        assertEquals(config.mergedProperties["project.artifactId"], config.mergedProperties["pom.artifactId"])
+        assertEquals(config.mergedProperties["project.version"], config.mergedProperties["pom.version"])
+        assertEquals(config.mergedProperties["project.basedir"], config.mergedProperties["pom.basedir"])
+    }
+
+    @Test
+    fun testBuiltInProperties_InheritedFromParent() {
+        val artifactOutput = tempFolder.newFolder("out").toPath()
+        val config = reader.buildConfigWithParent(
+            childPomPath = CORE_LIB_POM,
+            parentPomPath = MULTI_MODULE_POM,
+            activeProfileIds = emptyList(),
+            artifactOutputPath = artifactOutput,
+            artifactType = ArtifactType.JAR
+        )
+        // core-lib has no groupId/version of its own — inherits from parent
+        assertEquals("com.example", config.mergedProperties["project.groupId"])
+        assertEquals("1.0.0", config.mergedProperties["project.version"])
+    }
+
+    // -------------------------------------------------------------------------
+    // Property substitution in directory paths
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun testDirectoryWithBasedirPlaceholder_Resolved() {
+        val projDir = tempFolder.newFolder("basedir-test").toPath()
+        Files.createDirectories(projDir.resolve("src/main/resources"))
+        Files.writeString(projDir.resolve("pom.xml"), """
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.test</groupId>
+                <artifactId>basedir-test</artifactId>
+                <version>1.0.0</version>
+                <build>
+                    <resources>
+                        <resource>
+                            <directory>${'$'}{basedir}/src/main/resources</directory>
+                            <filtering>true</filtering>
+                        </resource>
+                    </resources>
+                </build>
+            </project>
+        """.trimIndent())
+
+        val config = reader.buildConfig(
+            projDir.resolve("pom.xml"), emptyList(), tempFolder.root.toPath(), ArtifactType.JAR
+        )
+
+        val expectedDir = projDir.toAbsolutePath().toString() + "/src/main/resources"
+        assertEquals(expectedDir, config.resources[0].directory)
+    }
+
+    @Test
+    fun testWebResourceDirectoryWithBasedirPlaceholder_Resolved() {
+        val projDir = tempFolder.newFolder("webres-test").toPath()
+        Files.createDirectories(projDir.resolve("profiles/dev"))
+        Files.writeString(projDir.resolve("pom.xml"), """
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.test</groupId>
+                <artifactId>webres-test</artifactId>
+                <version>1.0.0</version>
+                <packaging>war</packaging>
+                <profiles>
+                    <profile>
+                        <id>dev</id>
+                        <build>
+                            <plugins>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-war-plugin</artifactId>
+                                    <configuration>
+                                        <webResources>
+                                            <resource>
+                                                <directory>${'$'}{basedir}/profiles/dev</directory>
+                                            </resource>
+                                        </webResources>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </build>
+                    </profile>
+                </profiles>
+            </project>
+        """.trimIndent())
+
+        val config = reader.buildConfig(
+            projDir.resolve("pom.xml"), listOf("dev"), tempFolder.root.toPath(), ArtifactType.WAR
+        )
+
+        val expectedDir = projDir.toAbsolutePath().toString() + "/profiles/dev"
+        assertEquals(expectedDir, config.webResources[0].directory)
+    }
+
+    @Test
+    fun testPropertyValuesWithPlaceholders_Resolved() {
+        val projDir = tempFolder.newFolder("prop-resolve").toPath()
+        Files.writeString(projDir.resolve("pom.xml"), """
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.test</groupId>
+                <artifactId>prop-resolve</artifactId>
+                <version>2.0.0</version>
+                <properties>
+                    <custom.path>${'$'}{basedir}/custom</custom.path>
+                    <output.dir>${'$'}{project.build.directory}/generated</output.dir>
+                </properties>
+            </project>
+        """.trimIndent())
+
+        val config = reader.buildConfig(
+            projDir.resolve("pom.xml"), emptyList(), tempFolder.root.toPath(), ArtifactType.JAR
+        )
+
+        val basedir = projDir.toAbsolutePath().toString()
+        assertEquals("$basedir/custom", config.mergedProperties["custom.path"])
+        assertEquals("$basedir/target/generated", config.mergedProperties["output.dir"])
+    }
+
+    // -------------------------------------------------------------------------
+    // Property placeholders in webResource directory and includes
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun testWebResourceDirectoryAndIncludes_PropertyPlaceholders() {
+        val projDir = tempFolder.newFolder("webres-props").toPath()
+        Files.createDirectories(projDir.resolve("profiles/development/WEB-INF"))
+        Files.writeString(projDir.resolve("pom.xml"), """
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.test</groupId>
+                <artifactId>webres-props</artifactId>
+                <version>1.0.0</version>
+                <packaging>war</packaging>
+                <profiles>
+                    <profile>
+                        <id>dev</id>
+                        <properties>
+                            <base.dir>${'$'}{basedir}</base.dir>
+                            <build.profile.id>development</build.profile.id>
+                            <config.subdir>WEB-INF</config.subdir>
+                        </properties>
+                        <build>
+                            <plugins>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-war-plugin</artifactId>
+                                    <configuration>
+                                        <webResources>
+                                            <resource>
+                                                <directory>${'$'}{base.dir}/profiles/${'$'}{build.profile.id}</directory>
+                                                <filtering>true</filtering>
+                                                <includes>
+                                                    <include>${'$'}{config.subdir}/**</include>
+                                                </includes>
+                                                <excludes>
+                                                    <exclude>${'$'}{config.subdir}/excluded-${'$'}{build.profile.id}.xml</exclude>
+                                                </excludes>
+                                            </resource>
+                                        </webResources>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </build>
+                    </profile>
+                </profiles>
+            </project>
+        """.trimIndent())
+
+        val config = reader.buildConfig(
+            projDir.resolve("pom.xml"), listOf("dev"), tempFolder.root.toPath(), ArtifactType.WAR
+        )
+
+        val basedir = projDir.toAbsolutePath().toString()
+        val wr = config.webResources[0]
+        assertEquals("$basedir/profiles/development", wr.directory)
+        assertEquals(listOf("WEB-INF/**"), wr.includes)
+        assertEquals(listOf("WEB-INF/excluded-development.xml"), wr.excludes)
+        assertTrue(wr.filtering)
+    }
+
+    // -------------------------------------------------------------------------
+    // resolvePropertyPlaceholders utility
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun testResolvePropertyPlaceholders_Basic() {
+        val props = mapOf("basedir" to "/home/user/project", "env" to "dev")
+        assertEquals("/home/user/project/src", MavenModelReader.resolvePropertyPlaceholders("\${basedir}/src", props))
+        assertEquals("dev-config", MavenModelReader.resolvePropertyPlaceholders("\${env}-config", props))
+    }
+
+    @Test
+    fun testResolvePropertyPlaceholders_UnresolvedLeftAsIs() {
+        val props = mapOf("known" to "value")
+        assertEquals("\${unknown}/path", MavenModelReader.resolvePropertyPlaceholders("\${unknown}/path", props))
+    }
+
+    @Test
+    fun testResolvePropertyPlaceholders_NoPlaceholders() {
+        val props = mapOf("basedir" to "/home")
+        assertEquals("plain/path", MavenModelReader.resolvePropertyPlaceholders("plain/path", props))
+    }
 }
